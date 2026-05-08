@@ -1,144 +1,63 @@
-# Kunlun-M 通用 Skill（kunlun-m-general）
+# Kunlun-M Skill（kunlun-m-general）
 
-本 Skill 目标是把 Kunlun-M 的常用流程自动化：扫描漏洞、生成 rule、生成 tamper、同步与验证。
+这个文档面向“落地执行”：所有操作优先通过 skill 自带脚本完成（下载/初始化/扫描/生成/回归/可选同步）。
 
-## 前置条件与初始化
+## 1) 一键准备环境（没项目也能跑）
 
-Kunlun-M 的 CLI 运行在 Django 环境中。首次使用前需要完成依赖安装与数据库初始化，否则扫描/同步会报数据库相关错误。
-
-## 获取 Kunlun-M（当环境里只有 skill 时）
-
-如果环境里只有 skill，没有 Kunlun-M 项目目录（找不到 `kunlun.py`），需要先下载项目：
-
-### 方式 0：直接跑 bootstrap 脚本（推荐）
+在任意工作目录执行：
 
 ```bash
 python skills/kunlun-m-general/scripts/bootstrap_kunlunm.py --repo-dir ./Kunlun-M
 ```
 
-### 方式 A：git clone（推荐）
+默认行为：优先 git clone，失败回退 zip；然后自动执行依赖安装、复制 `settings.py`、初始化 DB、load rules/tamper。输出为 Kunlun-M 项目目录路径。
+
+## 2) 日常操作统一用 kunlun_ops.py
+
+约定：`--repo-root` 指向 Kunlun-M 目录（里面有 `kunlun.py`）。
+
+### 扫描
 
 ```bash
-git clone https://github.com/LoRexxar/Kunlun-M.git
-cd Kunlun-M
+python skills/kunlun-m-general/scripts/kunlun_ops.py --repo-root ./Kunlun-M scan -t <target> -lan php -b vendor,node_modules -d
 ```
 
-### 方式 B：下载 zip（无 git 环境）
+### 自定义 source/sink 扫描时如何落地（核心）
+
+- sink（危险点）→ 生成/调整 rule，然后 `scan -r <id>` 回归
+- source（输入源）+ repair（净化函数）→ 生成/调整 tamper，然后 `scan -tp <name>` 回归
+
+### 生成 rule（定义 sink）
 
 ```bash
-curl -L -o Kunlun-M.zip https://github.com/LoRexxar/Kunlun-M/archive/refs/heads/master.zip
-unzip Kunlun-M.zip
-cd Kunlun-M-master
+python skills/kunlun-m-general/scripts/kunlun_ops.py --repo-root ./Kunlun-M gen-rule -lan php --name "<rule_name>" --match "<sink_regex>"
+python skills/kunlun-m-general/scripts/kunlun_ops.py --repo-root ./Kunlun-M scan -t <target> -lan php -r <id>
 ```
 
-然后在项目根目录继续执行初始化命令：
+### 生成 tamper（定义 source/repair）
 
 ```bash
-pip install -r requirements.txt
-cp Kunlun_M/settings.py.bak Kunlun_M/settings.py
-python kunlun.py init initialize
-python kunlun.py config load
-python kunlun.py config loadtamper
+python skills/kunlun-m-general/scripts/kunlun_ops.py --repo-root ./Kunlun-M gen-tamper --name <proj> --controlled "<sources>"
+python skills/kunlun-m-general/scripts/kunlun_ops.py --repo-root ./Kunlun-M scan -t <target> -lan php -tp <proj>
 ```
 
-## 安装
+### 同步到数据库（可选）
 
-把仓库内的 `skills/kunlun-m-general` 安装到本机 Trae/SOLO skills 目录：
+只在需要 Web 端管理时做同步：
 
 ```bash
-python tools/install_trae_skill.py --name kunlun-m-general --force
+python skills/kunlun-m-general/scripts/kunlun_ops.py --repo-root ./Kunlun-M sync --rule --tamper
 ```
 
-安装成功会输出目标目录路径，例如：
+## 3) 平台结构适配
 
-```
-C:\Users\<you>\.trae\skills\kunlun-m-general
-```
+不同平台通常只要求 skill 放置在特定目录，可参考：
 
-## CLI 流程速查
+- `skills/kunlun-m-general/platforms/README.md`
+- 一键复制：`python skills/kunlun-m-general/scripts/install_platform.py --platform <openclaw|codex|claude-code|hermes> --scope <user|project> --repo-root <repo> --force`
 
-更完整的 CLI 文档见：
+## 4) 相关文档
 
-- [cli.md](file:///d:/program/Kunlun_M/docs/cli.md)
-- [rules.md](file:///d:/program/Kunlun_M/docs/rules.md)
-- [tamper.md](file:///d:/program/Kunlun_M/docs/tamper.md)
-
-## 概念速查（为什么要生成 rule/tamper）
-
-### Rule（规则）
-
-- 作用：定义漏洞识别逻辑（命中点、匹配模式、必要时的参数抽取与语义回溯入口）
-- 什么时候需要：漏报补齐、新漏洞模式沉淀、团队/CI 交付
-- 如何落地：`generate rule` 先出骨架 → 修改 `match/match_mode/main()` → `scan -r <id>` 小范围验证
-
-### Tamper（污点/修复策略）
-
-- 作用：告诉引擎哪些是“过滤/净化函数（repair）”以及哪些是“可控输入源（controlled）”，用于降低误报与适配框架封装
-- 什么时候需要：误报集中在某框架/CMS、输入源封装导致回溯无法识别可控来源
-- 如何落地：`generate tamper` 先出骨架 → 补齐过滤函数/输入源 → `scan -tp <name>` 回归验证
-
-### 1) 扫描漏洞
-
-```bash
-python kunlun.py scan -t <target_path>
-python kunlun.py scan -t <target_path> -lan php -b vendor,node_modules -d
-python kunlun.py scan -t <target_path> -r 1000,1001
-python kunlun.py scan -t <target_path> -tp wordpress
-```
-
-### 2) 生成 rule（脚手架）
-
-```bash
-python kunlun.py generate rule -lan php --name "Reflected XSS"
-python kunlun.py generate rule -lan php --name "Reflected XSS" --match "echo|print" --sync
-```
-
-默认编号按语言分段并自增：
-
-- php：1000+
-- javascript：2000+
-- solidity：3000+
-- chrome_ext：4000+
-
-### 3) 生成 tamper（脚手架）
-
-```bash
-python kunlun.py generate tamper --name wordpress
-python kunlun.py generate tamper --name wordpress --controlled "$_GET,$_POST" --sync
-python kunlun.py generate tamper --name wordpress --filter-func "{\"esc_html\": [1000], \"esc_attr\": [1000]}"
-```
-
-### 4) 单独同步（文件 ↔ 数据库）
-
-```bash
-python kunlun.py config load
-python kunlun.py config loadtamper
-```
-
-## 端到端示例
-
-### 示例 A：扫描一个目录
-
-```bash
-python kunlun.py scan -t ./my_project -lan php -b vendor,node_modules -d
-```
-
-### 示例 B：生成一个 php rule → 小范围验证
-
-```bash
-python kunlun.py generate rule -lan php --name "My Test Rule"
-python kunlun.py scan -t ./my_project -lan php -r 1000
-```
-
-### 示例 C：生成一个 tamper → 回归验证
-
-```bash
-python kunlun.py generate tamper --name mycms --controlled "$_GET,$_POST"
-python kunlun.py scan -t ./my_project -lan php -tp mycms
-```
-
-## 常见错误与排查
-
-- 报数据库表不存在/迁移问题：先执行 `python kunlun.py init initialize`
-- `--sync` 报错：确认数据库可写，且已执行过 `config load/loadtamper`
-- `ModuleNotFoundError`：确认依赖已 `pip install -r requirements.txt`
+- CLI： [cli.md](./cli.md)
+- Rule： [rules.md](./rules.md)
+- Tamper： [tamper.md](./tamper.md)

@@ -157,6 +157,19 @@ python3 kunlun.py show tamper         # 展示所有的tamper
 
 使用不同子模式的-h可以查看详细的帮助文档。
 
+### skill automation
+
+提供 `kunlun-m-general` skill（脚本化工作流）：在“环境里没有 Kunlun-M 项目”时自动下载并初始化；并用统一脚本封装 scan / 生成 rule（sink）/ 生成 tamper（source+repair）/ 回归验证。
+
+```
+python3 skills/kunlun-m-general/scripts/bootstrap_kunlunm.py --repo-dir ./Kunlun-M
+python3 skills/kunlun-m-general/scripts/kunlun_ops.py --repo-root ./Kunlun-M scan -t <target> -lan php -d
+python3 skills/kunlun-m-general/scripts/kunlun_ops.py --repo-root ./Kunlun-M gen-rule -lan php --name "<rule_name>" --match "<sink_regex>"
+python3 skills/kunlun-m-general/scripts/kunlun_ops.py --repo-root ./Kunlun-M gen-tamper --name <proj> --controlled "<sources>"
+```
+
+更多说明见 [docs/skill_kunlunm_general.md](./docs/skill_kunlunm_general.md)
+
 ### CI/CD scan driver
 
 在 CI/CD 中跑扫描并做门禁（稳定 JSON 报告 + 明确退出码）：
