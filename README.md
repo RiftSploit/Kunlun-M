@@ -64,13 +64,6 @@ Kunlun-Mirror是从Cobra-W2.0发展而来，在经历了痛苦的维护改进原
 
 KunLun-M可能是市面上唯一的开源并长期维护的自动化代码审计工具，希望开源工具可以推动白盒审计的发展:>.
 
-## 社区化工具
-
-社区成员完成的拓展（不保证安全性，参考使用）
-
-- [Kunlun-M-GUI](https://github.com/mark0smith/Kunlun-M-GUI)
-- [docker-kunlun-mirror](https://github.com/lazychanger/docker-kunlun-mirror)
-
 ## 更新日志
 
 [changelog.md](./docs/changelog.md)
