@@ -1,0 +1,8 @@
+interface:
+  display_name: "Kunlun-M General"
+  short_description: "Bootstrap Kunlun-M, scan code, scaffold rule/tamper, verify."
+  default_prompt: "请使用 kunlun-m-general：先 bootstrap（如需要），再按需 scan / gen-rule / gen-tamper，并给出可复制的回归命令。"
+
+policy:
+  allow_implicit_invocation: true
+

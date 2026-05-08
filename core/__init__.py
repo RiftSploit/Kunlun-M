@@ -36,6 +36,7 @@ from .__version__ import __author__, __author_email__, __license__
 from .__version__ import __copyright__, __epilog__, __scan_epilog__, __database_epilog__
 
 from core.rule import RuleCheck, TamperCheck
+from core.scaffold import write_rule_file, write_tamper_file
 from core.console import KunlunInterpreter
 from web.index.models import ScanTask, check_and_new_project_id
 
@@ -68,6 +69,37 @@ def main():
         # load config into database
         parser_group_core = subparsers.add_parser('config', help='config for rule&tamper', description=__introduction__.format(detail='config for rule&tamper'), epilog=__database_epilog__, formatter_class=argparse.RawDescriptionHelpFormatter, usage=argparse.SUPPRESS, add_help=True)
         parser_group_core.add_argument('load', choices=['load', 'recover', 'loadtamper', 'retamper'], default=False, help='operate for rule&tamper')
+
+        parser_group_generate = subparsers.add_parser(
+            'generate',
+            help='generate rule & tamper',
+            description=__introduction__.format(detail='generate rule & tamper'),
+            formatter_class=argparse.RawDescriptionHelpFormatter,
+            usage=argparse.SUPPRESS,
+            add_help=True,
+        )
+        parser_group_generate_sub = parser_group_generate.add_subparsers(dest='generate_type')
+
+        parser_generate_rule = parser_group_generate_sub.add_parser('rule', help='generate rule file')
+        parser_generate_rule.add_argument('-lan', '--language', dest='language', action='store', default=None, help='language (php/javascript/solidity/chrome_ext)')
+        parser_generate_rule.add_argument('--name', dest='rule_name', action='store', default=None, help='rule name (vulnerability)')
+        parser_generate_rule.add_argument('--author', dest='author', action='store', default=__author__, help='author')
+        parser_generate_rule.add_argument('--description', dest='rule_description', action='store', default=None, help='description')
+        parser_generate_rule.add_argument('--level', dest='level', action='store', default=1, type=int, help='level')
+        parser_generate_rule.add_argument('--disable', dest='disable', action='store_true', default=False, help='disable rule')
+        parser_generate_rule.add_argument('--match-mode', dest='match_mode', action='store', default='function-param-regex', help='match mode')
+        parser_generate_rule.add_argument('--match', dest='match', action='store', default=None, help='match regex or python literal')
+        parser_generate_rule.add_argument('--unmatch', dest='unmatch', action='store', default=None, help='unmatch regex or python literal')
+        parser_generate_rule.add_argument('--svid', dest='svid', action='store', default=None, type=int, help='rule id')
+        parser_generate_rule.add_argument('--sync', dest='sync', action='store_true', default=False, help='sync to database after generated')
+        parser_generate_rule.add_argument('--force', dest='force', action='store_true', default=False, help='overwrite if file exists')
+
+        parser_generate_tamper = parser_group_generate_sub.add_parser('tamper', help='generate tamper file')
+        parser_generate_tamper.add_argument('--name', dest='tamper_name', action='store', default=None, help='tamper name')
+        parser_generate_tamper.add_argument('--filter-func', dest='filter_func', action='store', default=None, help='json dict or k=v,k=v')
+        parser_generate_tamper.add_argument('--controlled', dest='controlled', action='store', default=None, help='controlled sources list split by ,')
+        parser_generate_tamper.add_argument('--sync', dest='sync', action='store_true', default=False, help='sync to database after generated')
+        parser_generate_tamper.add_argument('--force', dest='force', action='store_true', default=False, help='overwrite if file exists')
 
         parser_group_scan = subparsers.add_parser('scan', help='scan target path', description=__introduction__.format(detail='scan target path'), epilog=__scan_epilog__, formatter_class=argparse.RawDescriptionHelpFormatter, add_help=True)
         parser_group_scan.add_argument('-t', '--target', dest='target', action='store', default='', metavar='<target>', help='file, folder')
@@ -210,6 +242,48 @@ def main():
 
             else:
                 parser_group_core.print_help()
+                exit()
+
+        if hasattr(args, "generate_type") and args.generate_type:
+            if args.generate_type == "rule":
+                if not args.language or not args.rule_name:
+                    parser_group_generate.print_help()
+                    exit()
+                rid, rule_path = write_rule_file(
+                    language=args.language,
+                    rule_name=args.rule_name,
+                    author=args.author,
+                    description=args.rule_description,
+                    svid=args.svid,
+                    level=args.level,
+                    status=not args.disable,
+                    match_mode=args.match_mode,
+                    match=args.match,
+                    unmatch=args.unmatch,
+                    force=args.force,
+                )
+                logger.info("[INIT] Generated rule CVI_{}: {}".format(rid, rule_path))
+                if args.sync:
+                    logger.info("[INIT] RuleCheck start.")
+                    RuleCheck().load()
+                    logger.info("[INIT] RuleCheck finished.")
+                exit()
+
+            if args.generate_type == "tamper":
+                if not args.tamper_name:
+                    parser_group_generate.print_help()
+                    exit()
+                tamper_path = write_tamper_file(
+                    tam_name=args.tamper_name,
+                    filter_func=args.filter_func,
+                    controlled=args.controlled,
+                    force=args.force,
+                )
+                logger.info("[INIT] Generated tamper {}: {}".format(args.tamper_name, tamper_path))
+                if args.sync:
+                    logger.info("[INIT] TamperCheck start.")
+                    TamperCheck().load()
+                    logger.info("[INIT] TamperCheck finished.")
                 exit()
 
         if hasattr(args, "list"):
