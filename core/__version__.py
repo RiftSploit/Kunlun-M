@@ -40,6 +40,8 @@ __scan_epilog__ = """Usage:
   python {m} scan -t {td} -r 1000, 1001
   python {m} scan -t {td} -tp wordpress
   python {m} scan -t {td} -f json -o /tmp/report.json 
+  python {m} scan -t {td} -f md -o /tmp/report.md
+  python {m} scan -t {td} -f html -o /tmp/report.html
   python {m} scan -t {td} --debug
   python {m} scan -t {td} -d -u
   python {m} scan -t {td} --lan php -b vendor --debug

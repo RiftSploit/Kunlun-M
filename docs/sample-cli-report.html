@@ -1,0 +1,379 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Kunlun-M 扫描结果报告（示例）</title>
+  <style>
+    :root{--bg:#f4f6fb;--panel:#ffffff;--panel2:#f7f9ff;--text:#0f172a;--muted:#64748b;--border:rgba(15,23,42,.12);--shadow:0 18px 55px rgba(2,6,23,.08);--shadow2:0 10px 28px rgba(2,6,23,.06);--radius:16px;--accent:#2563eb;--good:#10b981;--warn:#f59e0b;--bad:#ef4444;--crit:#7c3aed}
+    *{box-sizing:border-box}
+    body{margin:0;background:radial-gradient(1100px 760px at 14% 10%,rgba(37,99,235,.14),transparent 62%),radial-gradient(900px 620px at 86% 14%,rgba(124,58,237,.10),transparent 58%),linear-gradient(180deg,#ffffff,var(--bg));color:var(--text);font:14px/1.6 -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif}
+    .wrap{max-width:1200px;margin:0 auto;padding:28px 18px 48px}
+    .hero{background:linear-gradient(135deg,rgba(37,99,235,.10),rgba(124,58,237,.06));border:1px solid var(--border);box-shadow:var(--shadow2);border-radius:22px;padding:22px 22px 18px}
+    .hero-top{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:14px;align-items:start}
+    .title{display:flex;gap:14px;align-items:baseline;flex-wrap:wrap}
+    h1{margin:0;font-size:26px;letter-spacing:.2px}
+    .subtitle{color:var(--muted);word-break:break-all}
+    .meta{margin-top:14px}
+    .sidebar{display:flex;flex-direction:column;gap:10px}
+    .sidebox{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:12px 12px;box-shadow:0 10px 24px rgba(2,6,23,.04)}
+    .sidebox .t{font-size:12px;color:var(--muted);letter-spacing:.3px;text-transform:uppercase}
+    .sidebox .v{margin-top:8px;font-weight:800;font-size:18px;letter-spacing:.2px}
+    .sidebox .sub{margin-top:4px;color:var(--muted);font-size:12px}
+    .kvs{margin-top:10px;display:flex;flex-direction:column;gap:8px}
+    .kvrow{display:flex;gap:10px;justify-content:space-between;align-items:baseline}
+    .kvrow .k{color:var(--muted);font-size:12px}
+    .kvrow .v{color:rgba(15,23,42,.86);font-size:12px;max-width:210px;word-break:break-all;text-align:right}
+    .kv{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:10px 12px;box-shadow:0 10px 25px rgba(2,6,23,.04)}
+    .kv .k{color:var(--muted);font-size:12px}
+    .kv .v{margin-top:3px;word-break:break-all}
+    .cards{margin-top:18px;display:flex;gap:10px;flex-wrap:nowrap;overflow:auto;padding-bottom:2px}
+    .card{position:relative;flex:0 0 220px;background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:12px 12px 11px;box-shadow:0 10px 24px rgba(2,6,23,.04);overflow:hidden}
+    .card:before{content:"";position:absolute;left:0;top:0;right:0;height:3px;background:linear-gradient(90deg,rgba(37,99,235,.65),rgba(124,58,237,.55))}
+    .card:after{content:"";position:absolute;right:-38px;top:-38px;width:96px;height:96px;border-radius:999px;background:radial-gradient(circle at 30% 30%,rgba(37,99,235,.18),rgba(124,58,237,.10),transparent 62%)}
+    .card .n{font-size:28px;font-weight:900;letter-spacing:.2px;font-variant-numeric:tabular-nums}
+    .card .d{color:rgba(15,23,42,.68);font-size:12px;margin-top:0}
+    .card.total:before{background:linear-gradient(90deg,#2563eb,#7c3aed)}
+    .card.files:before{background:linear-gradient(90deg,#06b6d4,#10b981)}
+    .card.unconfirmed:before{background:linear-gradient(90deg,#f59e0b,#ef4444)}
+    .card.files:after{background:radial-gradient(circle at 30% 30%,rgba(6,182,212,.18),rgba(16,185,129,.10),transparent 62%)}
+    .card.unconfirmed:after{background:radial-gradient(circle at 30% 30%,rgba(245,158,11,.18),rgba(239,68,68,.10),transparent 62%)}
+    .card .cap{display:flex;gap:8px;align-items:center;justify-content:space-between}
+    .card .cap .label{color:rgba(15,23,42,.62);font-size:12px;letter-spacing:.2px}
+    .card .cap .hint{color:rgba(15,23,42,.42);font-size:12px}
+    .toolbar{margin-top:18px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    .search{flex:1;min-width:260px}
+    input[type="search"]{width:100%;padding:12px 12px;border-radius:14px;border:1px solid var(--border);background:var(--panel);color:var(--text);outline:none;box-shadow:0 8px 18px rgba(2,6,23,.03)}
+    input[type="search"]::placeholder{color:rgba(100,116,139,.75)}
+    .btn{padding:10px 12px;border-radius:999px;border:1px solid var(--border);background:var(--panel);color:var(--text);cursor:pointer;user-select:none;box-shadow:0 8px 18px rgba(2,6,23,.03)}
+    .btn:hover{border-color:rgba(37,99,235,.35)}
+    .btn.active{border-color:rgba(37,99,235,.55);box-shadow:0 0 0 3px rgba(37,99,235,.14) inset,0 8px 18px rgba(2,6,23,.03)}
+    .table{margin-top:14px;background:var(--panel);border:1px solid var(--border);border-radius:18px;overflow:hidden;box-shadow:var(--shadow2)}
+    table{width:100%;border-collapse:separate;border-spacing:0 10px}
+    thead th{padding:12px 12px}
+    tbody td{padding:0 12px;border-bottom:none}
+    th{font-size:12px;letter-spacing:.3px;text-transform:uppercase;color:var(--muted);background:var(--panel2);text-align:left}
+    .tag{display:inline-flex;align-items:center;gap:6px;border:1px solid rgba(15,23,42,.10);background:rgba(248,250,252,.9);padding:3px 8px;border-radius:999px;font-size:12px;color:rgba(15,23,42,.82)}
+    .dot{width:8px;height:8px;border-radius:50%}
+    .sev-critical .dot{background:var(--crit)}
+    .sev-high .dot{background:var(--bad)}
+    .sev-medium .dot{background:var(--warn)}
+    .sev-low .dot{background:var(--good)}
+    .sev-unknown .dot{background:#94a3b8}
+    .rowcard{display:grid;grid-template-columns:44px 120px 1fr;gap:12px;align-items:center;padding:12px 12px;background:var(--panel);border:1px solid var(--border);border-radius:16px;box-shadow:0 10px 24px rgba(2,6,23,.04)}
+    .rowcard:hover{border-color:rgba(37,99,235,.24);box-shadow:0 18px 42px rgba(2,6,23,.08)}
+    .rc-idx{display:flex;align-items:center;justify-content:center;height:32px;border-radius:12px;background:var(--panel2);border:1px solid rgba(15,23,42,.08);color:var(--muted);font-weight:700;font-variant-numeric:tabular-nums}
+    .rc-sev{display:flex;align-items:center}
+    .rc-main{min-width:0}
+    .finding-top{display:flex;gap:8px 10px;align-items:baseline;flex-wrap:wrap}
+    .finding-rule{font-weight:800;font-size:14px;letter-spacing:.1px}
+    .finding-code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,Monaco,monospace;font-size:12px;color:rgba(15,23,42,.62)}
+    .finding-sub{margin-top:4px;color:var(--muted);display:flex;gap:10px;flex-wrap:wrap}
+    .finding-loc{font-size:12px}
+    .chip{display:inline-flex;align-items:center;gap:6px;border:1px solid rgba(15,23,42,.10);background:rgba(37,99,235,.06);padding:2px 8px;border-radius:999px;font-size:12px;color:rgba(15,23,42,.78)}
+    .chip-warn{background:rgba(245,158,11,.10)}
+    details{margin-top:10px;border:1px solid var(--border);border-radius:18px;background:var(--panel);overflow:hidden;box-shadow:var(--shadow2)}
+    summary{list-style:none;cursor:pointer;padding:14px 14px;display:flex;gap:10px;align-items:center}
+    summary::-webkit-details-marker{display:none}
+    details[open] summary{background:rgba(37,99,235,.04)}
+    .sumline{display:flex;gap:10px;align-items:center;flex-wrap:wrap;width:100%}
+    .sumline .main{font-weight:700}
+    .sumline .muted{color:var(--muted)}
+    .body{padding:0 14px 14px}
+    .grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:10px}
+    .panel{background:var(--panel2);border:1px solid rgba(15,23,42,.08);border-radius:14px;padding:10px 12px}
+    pre{margin:0;white-space:pre-wrap;word-break:break-word;background:#f7f9fd;border:1px solid rgba(15,23,42,.10);border-radius:14px;padding:12px 12px;overflow:auto}
+    code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,Monaco,monospace;font-size:12px;color:rgba(15,23,42,.92)}
+    .footer{margin-top:22px;color:var(--muted);font-size:12px}
+    @media (max-width:980px){.hero-top{grid-template-columns:1fr}.grid{grid-template-columns:1fr}}
+    @media print{body{background:#fff}.hero,.table,details,.card,.kv{box-shadow:none} .btn,.toolbar{display:none}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="hero">
+      <div class="hero-top">
+        <div>
+          <div class="title">
+            <h1>Kunlun-M 扫描结果报告</h1>
+            <div class="subtitle">d:/work/demo-project/</div>
+          </div>
+          <div class="cards">
+            <div class="card total"><div class="cap"><div class="label">Total Findings</div><div class="hint">All</div></div><div class="n">3</div></div>
+            <div class="card files"><div class="cap"><div class="label">Files Affected</div><div class="hint">Unique</div></div><div class="n">3</div></div>
+            <div class="card unconfirmed"><div class="cap"><div class="label">Unconfirmed</div><div class="hint">Needs Review</div></div><div class="n">1</div></div>
+          </div>
+        </div>
+        <div class="sidebar">
+          <div class="sidebox">
+            <div class="t">Project</div>
+            <div class="v">demo-project</div>
+            <div class="sub">Target</div>
+          </div>
+          <div class="sidebox">
+            <div class="t">Details</div>
+            <div class="kvs">
+              <div class="kvrow"><div class="k">sid</div><div class="v">demo-20260508-001</div></div>
+              <div class="kvrow"><div class="k">exported_at</div><div class="v">2026-05-08T08:20:00Z</div></div>
+              <div class="kvrow"><div class="k">schema_version</div><div class="v">1.0</div></div>
+              <div class="kvrow"><div class="k">generator</div><div class="v">Kunlun-M CLI Exporter</div></div>
+              <div class="kvrow"><div class="k">language</div><div class="v">php,javascript</div></div>
+              <div class="kvrow"><div class="k">framework</div><div class="v">laravel</div></div>
+              <div class="kvrow"><div class="k">file</div><div class="v">231</div></div>
+              <div class="kvrow"><div class="k">extension</div><div class="v">421</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="toolbar">
+        <div class="search"><input id="q" type="search" placeholder="搜索：规则名 / 文件 / 代码 / 分析…"/></div>
+        <button class="btn active" data-filter-sev="all">ALL</button>
+        <button class="btn" data-filter-sev="critical">CRITICAL</button>
+        <button class="btn" data-filter-sev="high">HIGH</button>
+        <button class="btn" data-filter-sev="medium">MEDIUM</button>
+        <button class="btn" data-filter-sev="low">LOW</button>
+        <button class="btn" data-filter-sev="unknown">UNKNOWN</button>
+        <button class="btn" id="expand">展开全部</button>
+        <button class="btn" id="collapse">收起全部</button>
+      </div>
+    </div>
+
+    <div class="table">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Severity</th>
+            <th>Finding</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="row" data-sev="critical" data-text="sql injection php app/http/controllers/usercontroller.php:128 high risk: untrusted parameter used in raw query select * from users where id = $id">
+            <td colspan="3">
+              <div class="rowcard">
+                <div class="rc-idx">1</div>
+                <div class="rc-sev"><span class="tag sev-critical"><span class="dot"></span>CRITICAL</span></div>
+                <div class="rc-main">
+                  <div class="finding-top">
+                    <span class="finding-rule">SQL Injection</span>
+                    <span class="finding-code">CVI-110001</span>
+                    <span class="chip">php</span>
+                  </div>
+                  <div class="finding-sub">
+                    <span class="finding-loc">app/Http/Controllers/UserController.php:128</span>
+                  </div>
+                </div>
+              </div>
+            </td>
+          </tr>
+          <tr class="row" data-sev="high" data-text="xss javascript assets/js/profile.js:74 reflected xss by location.hash sink element.innerhtml = hash">
+            <td colspan="3">
+              <div class="rowcard">
+                <div class="rc-idx">2</div>
+                <div class="rc-sev"><span class="tag sev-high"><span class="dot"></span>HIGH</span></div>
+                <div class="rc-main">
+                  <div class="finding-top">
+                    <span class="finding-rule">Reflected XSS</span>
+                    <span class="finding-code">CVI-220013</span>
+                    <span class="chip">javascript</span>
+                    <span class="chip chip-warn">UNCONFIRMED</span>
+                  </div>
+                  <div class="finding-sub">
+                    <span class="finding-loc">assets/js/profile.js:74</span>
+                  </div>
+                </div>
+              </div>
+            </td>
+          </tr>
+          <tr class="row" data-sev="medium" data-text="path traversal php app/services/file.php:51 potential traversal path joins user input without canonicalization $path = $base . '/' . $_get['file'];">
+            <td colspan="3">
+              <div class="rowcard">
+                <div class="rc-idx">3</div>
+                <div class="rc-sev"><span class="tag sev-medium"><span class="dot"></span>MEDIUM</span></div>
+                <div class="rc-main">
+                  <div class="finding-top">
+                    <span class="finding-rule">Path Traversal</span>
+                    <span class="finding-code">CVI-130040</span>
+                    <span class="chip">php</span>
+                  </div>
+                  <div class="finding-sub">
+                    <span class="finding-loc">app/Services/File.php:51</span>
+                  </div>
+                </div>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div style="margin-top:14px">
+      <details class="item" data-sev="critical" data-text="1. sql injection (critical) app/http/controllers/usercontroller.php:128 high risk untrusted parameter used in raw query select * from users where id = $id">
+        <summary>
+          <div class="sumline">
+            <span class="tag sev-critical"><span class="dot"></span>CRITICAL</span>
+            <span class="main">1. SQL Injection (CRITICAL)</span>
+            <span class="muted">app/Http/Controllers/UserController.php:128</span>
+          </div>
+        </summary>
+        <div class="body">
+          <div class="grid">
+            <div class="panel"><div class="k">cvi_id</div><div class="v">110001</div></div>
+            <div class="panel"><div class="k">language</div><div class="v">php</div></div>
+            <div class="panel"><div class="k">commit_author</div><div class="v">Unknown</div></div>
+          </div>
+          <div class="panel" style="margin-top:10px"><div class="k">analysis</div><pre><code>High risk: untrusted parameter used in raw query.</code></pre></div>
+          <div class="panel" style="margin-top:10px"><div class="k">code_content</div><pre><code>$id = $_GET['id'];
+$sql = "SELECT * FROM users WHERE id = $id";
+$db-&gt;query($sql);</code></pre></div>
+          <div class="panel" style="margin-top:10px"><div class="k">chain</div><pre><code>[
+  [
+    "source",
+    "$id from $_GET",
+    "app/Http/Controllers/UserController.php",
+    "128"
+  ],
+  [
+    "sink",
+    "db-&gt;query($sql)",
+    "app/Http/Controllers/UserController.php",
+    "130"
+  ]
+]</code></pre></div>
+          <div class="panel" style="margin-top:10px"><div class="k">raw</div><pre><code>{
+  "id": "110001",
+  "rule_name": "SQL Injection",
+  "language": "php",
+  "file_path": "d:/work/demo-project/app/Http/Controllers/UserController.php",
+  "line_number": 128,
+  "code_content": "$id = $_GET['id'];\\n$sql = \\\"SELECT * FROM users WHERE id = $id\\\";\\n$db-&gt;query($sql);",
+  "analysis": "High risk: untrusted parameter used in raw query.",
+  "chain": [
+    [
+      "source",
+      "$id from $_GET",
+      "app/Http/Controllers/UserController.php",
+      "128"
+    ],
+    [
+      "sink",
+      "db-&gt;query($sql)",
+      "app/Http/Controllers/UserController.php",
+      "130"
+    ]
+  ],
+  "severity": "critical",
+  "relative_file": "app/Http/Controllers/UserController.php",
+  "location": "app/Http/Controllers/UserController.php:128",
+  "is_unconfirm": false
+}</code></pre></div>
+        </div>
+      </details>
+
+      <details class="item" data-sev="high" data-text="2. reflected xss (high) assets/js/profile.js:74 unconfirmed location.hash sink element.innerhtml = hash">
+        <summary>
+          <div class="sumline">
+            <span class="tag sev-high"><span class="dot"></span>HIGH</span>
+            <span class="main">2. Reflected XSS (HIGH)</span>
+            <span class="muted">assets/js/profile.js:74</span>
+            <span class="tag"><span class="dot" style="background:var(--warn)"></span>UNCONFIRMED</span>
+          </div>
+        </summary>
+        <div class="body">
+          <div class="grid">
+            <div class="panel"><div class="k">cvi_id</div><div class="v">220013</div></div>
+            <div class="panel"><div class="k">language</div><div class="v">javascript</div></div>
+            <div class="panel"><div class="k">commit_author</div><div class="v">Unknown</div></div>
+          </div>
+          <div class="panel" style="margin-top:10px"><div class="k">analysis</div><pre><code>Unconfirmed: possible reflected XSS via location.hash.</code></pre></div>
+          <div class="panel" style="margin-top:10px"><div class="k">code_content</div><pre><code>const hash = window.location.hash.substring(1);
+document.getElementById("bio").innerHTML = hash;</code></pre></div>
+          <div class="panel" style="margin-top:10px"><div class="k">raw</div><pre><code>{
+  "id": "220013",
+  "rule_name": "Reflected XSS",
+  "language": "javascript",
+  "file_path": "d:/work/demo-project/assets/js/profile.js",
+  "line_number": 74,
+  "code_content": "const hash = window.location.hash.substring(1);\\ndocument.getElementById(\\\"bio\\\").innerHTML = hash;",
+  "analysis": "Unconfirmed: possible reflected XSS via location.hash.",
+  "severity": "high",
+  "relative_file": "assets/js/profile.js",
+  "location": "assets/js/profile.js:74",
+  "is_unconfirm": true
+}</code></pre></div>
+        </div>
+      </details>
+
+      <details class="item" data-sev="medium" data-text="3. path traversal (medium) app/services/file.php:51 potential traversal path joins user input without canonicalization">
+        <summary>
+          <div class="sumline">
+            <span class="tag sev-medium"><span class="dot"></span>MEDIUM</span>
+            <span class="main">3. Path Traversal (MEDIUM)</span>
+            <span class="muted">app/Services/File.php:51</span>
+          </div>
+        </summary>
+        <div class="body">
+          <div class="grid">
+            <div class="panel"><div class="k">cvi_id</div><div class="v">130040</div></div>
+            <div class="panel"><div class="k">language</div><div class="v">php</div></div>
+            <div class="panel"><div class="k">commit_author</div><div class="v">Unknown</div></div>
+          </div>
+          <div class="panel" style="margin-top:10px"><div class="k">analysis</div><pre><code>Potential traversal: path joins user input without canonicalization.</code></pre></div>
+          <div class="panel" style="margin-top:10px"><div class="k">code_content</div><pre><code>$base = "/var/app/storage";
+$path = $base . "/" . $_GET["file"];
+readfile($path);</code></pre></div>
+          <div class="panel" style="margin-top:10px"><div class="k">raw</div><pre><code>{
+  "id": "130040",
+  "rule_name": "Path Traversal",
+  "language": "php",
+  "file_path": "d:/work/demo-project/app/Services/File.php",
+  "line_number": 51,
+  "code_content": "$base = \\\"/var/app/storage\\\";\\n$path = $base . \\\"/\\\" . $_GET[\\\"file\\\"];\\nreadfile($path);",
+  "analysis": "Potential traversal: path joins user input without canonicalization.",
+  "severity": "medium",
+  "relative_file": "app/Services/File.php",
+  "location": "app/Services/File.php:51",
+  "is_unconfirm": false
+}</code></pre></div>
+        </div>
+      </details>
+    </div>
+
+    <div class="footer">Generated at 2026-05-08T08:20:00Z</div>
+  </div>
+
+  <script>
+    (function(){
+      var q = document.getElementById('q');
+      var sevBtns = Array.prototype.slice.call(document.querySelectorAll('[data-filter-sev]'));
+      var rows = Array.prototype.slice.call(document.querySelectorAll('tr.row'));
+      var items = Array.prototype.slice.call(document.querySelectorAll('details.item'));
+      var activeSev = 'all';
+      function apply(){
+        var text = (q.value || '').toLowerCase().trim();
+        function ok(el){
+          var sev = el.getAttribute('data-sev') || 'unknown';
+          var hay = el.getAttribute('data-text') || '';
+          if(activeSev !== 'all' && sev !== activeSev) return false;
+          if(text && hay.indexOf(text) === -1) return false;
+          return true;
+        }
+        rows.forEach(function(r){ r.style.display = ok(r) ? '' : 'none'; });
+        items.forEach(function(d){ d.style.display = ok(d) ? '' : 'none'; });
+      }
+      sevBtns.forEach(function(b){
+        b.addEventListener('click', function(){
+          sevBtns.forEach(function(x){ x.classList.remove('active'); });
+          b.classList.add('active');
+          activeSev = b.getAttribute('data-filter-sev') || 'all';
+          apply();
+        });
+      });
+      q.addEventListener('input', apply);
+      document.getElementById('expand').addEventListener('click', function(){ items.forEach(function(d){ d.open = true; }); });
+      document.getElementById('collapse').addEventListener('click', function(){ items.forEach(function(d){ d.open = false; }); });
+      apply();
+    })();
+  </script>
+</body>
+</html>

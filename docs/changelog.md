@@ -1,5 +1,13 @@
 ## 更新日志
 - 2026-05-08
+  - KunLun-M 2.8.1
+  - CLI 扫描结果导出增强
+    - JSON：补充 `meta/summary`，并规范化 `vulnerabilities` 字段（如 `severity/location/relative_file/is_unconfirm`）
+    - 新增 `-f md`：生成 Markdown 报告（包含全部漏洞详情）
+    - `-f html`：单文件自包含 HTML 报告，支持搜索、按严重度筛选、展开/收起全部，并对报告 UI 进行浅色高级风格重构（统计卡、概览卡片行、项目信息区）
+  - 文档更新
+    - `docs/cli.md`、`README.md` 补充导出示例与说明
+- 2026-05-08
   - KunLun-M 2.8.0
   - 新增内置的Skill，支持AI Agent（OpenClaw / Codex / Claude Code / Hermes 等）一键接入工具，快速扫描漏洞
 - 2026-05-07

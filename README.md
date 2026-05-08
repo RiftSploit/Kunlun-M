@@ -111,6 +111,13 @@ sudo docker build -t kunlun-m -f ./docker/Dockerfile .
 python3 kunlun.py scan -t ./tests/vulnerabilities/
 ```
 
+导出报告（JSON/Markdown/HTML）：
+```
+python3 kunlun.py scan -t ./tests/vulnerabilities/ -f json -o /tmp/report.json
+python3 kunlun.py scan -t ./tests/vulnerabilities/ -f md -o /tmp/report.md
+python3 kunlun.py scan -t ./tests/vulnerabilities/ -f html -o /tmp/report.html
+```
+
 使用config模式加载本地的rule/tamper
 ```
 python3 kunlun.py config load         # 加载rule进数据库
