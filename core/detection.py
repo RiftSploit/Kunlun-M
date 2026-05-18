@@ -108,9 +108,9 @@ class Detection(object):
             for rule_name in frame_data[frame_name]:
                 for project_data in projects_data:
                     if rule_name in project_data:
-                        logger.debug("[检测] [框架] 检测到项目可能使用的框架:" + frame_name)
+                        logger.debug("[DETECTION] [FRAMEWORK] Find the project's framework may be:" + frame_name)
                         return frame_name
-        logger.info('[检测] [框架] 未知框架')
+        logger.info('[DETECTION] [FRAMEWORK] Unknown Framework')
         return 'Unknown Framework'
 
     def dependency_scan(self, root):
@@ -127,7 +127,7 @@ class Detection(object):
             for rule in framework_infos[frame_name]['rule']:
                 for dependency in dependencies_info:
                     if rule in dependency:
-                        logger.debug("[检测] 检测到项目可能使用的框架:" + frame_name)
+                        logger.debug("Find the project's framework may be:" + frame_name)
                         return frame_name
         return None
 

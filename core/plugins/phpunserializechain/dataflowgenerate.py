@@ -113,7 +113,7 @@ class DataflowGenerate:
                 self.dataflows = []
 
                 base_locate = filename.replace('/', '#').replace('\\', '#').replace('.', '_')
-                logger.info("[PHP反序列化链] 新基础定位 {}".format(base_locate))
+                logger.info("[PhpUnSerChain] New Base locate {}".format(base_locate))
 
                 self.base_dataflow_generate(all_nodes, base_locate)
 
@@ -865,7 +865,7 @@ class DataflowGenerate:
                 raise
 
             except:
-                logger.warn("[PHP反序列化链] 发生错误..\n{}".format(traceback.format_exc()))
+                logger.warn("[PhpUnSerChain] Something error..\n{}".format(traceback.format_exc()))
                 continue
 
     def deep_obj_address_generate(self, node, base_locate, now_sort=False):

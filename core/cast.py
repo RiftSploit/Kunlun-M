@@ -93,7 +93,7 @@ class CAST(object):
         """
         # grep = Tool().grep
         if self.language not in self.regex:
-            logger.info("[AST] 未定义语言的函数正则 {0}".format(self.language))
+            logger.info("[AST] Undefined language's functions regex {0}".format(self.language))
             return False
         regex_functions = self.regex[self.language]['functions']
         f = FileParseAll(self.files, self.target_directory)
@@ -112,12 +112,12 @@ class CAST(object):
                     continue
 
                 if len(line) < 2:
-                    logger.info("[AST] 未找到(:)")
+                    logger.info("[AST] Not found(:)")
 
                 regex_annotation = self.regex[self.language]['annotation']
                 string = re.findall(regex_annotation, line[1])
                 if len(string) >= 1 and string[0] != '':
-                    logger.info("[AST] 该函数为注释")
+                    logger.info("[AST] This function is annotation")
 
                 function_name = re.findall(regex_functions, line[2])
                 if len(function_name) >= 1:
@@ -136,7 +136,7 @@ class CAST(object):
                         'end': None  # next function's start
                     }
                 else:
-                    logger.warning("[AST] 无法获取函数名: {0}".format(line))
+                    logger.warning("[AST] Can't get function name: {0}".format(line))
             end = sum(1 for l in open(self.file_path))
             for name, value in functions.items():
                 if value['end'] is None:
@@ -157,7 +157,7 @@ class CAST(object):
         """
         if block_position == 2:
             if self.line is None or self.line == 0:
-                logger.error("[AST] 行异常: {0}".format(self.line))
+                logger.error("[AST] Line exception: {0}".format(self.line))
                 return False
             line_rule = '{0}p'.format(self.line)
             code = File(self.file_path).lines(line_rule)
@@ -194,7 +194,7 @@ class CAST(object):
                 elif block_position == 3:
                     block_start = 1
                     block_end = sum(1 for l in open(self.file_path))
-                logger.debug("[AST] 没有找到任何 `function`，将拆分文件")
+                logger.debug("[AST] Not function anything `function`, will split file")
             # get param block code
             line_rule = "{0},{1}p".format(block_start, block_end)
             code = File(self.file_path).lines(line_rule)
@@ -212,7 +212,7 @@ class CAST(object):
             params = self.sr.main(param_name)
 
         if params is None:
-            logger.debug("[AST] 未匹配到变量...")
+            logger.debug("[AST] Not matching variables...")
             return False, -1, self.data, []
 
         for param_name in params:
@@ -233,26 +233,26 @@ class CAST(object):
                         logger.info("[AST] String's variables: `{variables}`".format(
                             variables=','.join(regex_get_variable_result)))
                     else:
-                        logger.debug("[AST] 字符串包含变量: `否`")
+                        logger.debug("[AST] String have variables: `No`")
                         return False, -1, self.data, []
-                logger.debug("[AST] 字符串包含变量: `是`")
+                logger.debug("[AST] String have variables: `Yes`")
 
                 # variable
                 if self.language == 'php':
-                    logger.debug("[AST] 是变量: `是`")
-                    logger.debug("[Deep AST] 开始对参数 {param_name} 进行 AST 分析".format(param_name=param_name))
+                    logger.debug("[AST] Is variable: `Yes`")
+                    logger.debug("[Deep AST] Start AST for param {param_name}".format(param_name=param_name))
 
                     _is_co, _cp, expr_lineno, chain = php_anlysis_params(param_name, self.file_path, self.line, self.sr.vul_function, self.repair_functions, self.controlled_list, isexternal=True)
 
                     if _is_co == 1:
-                        logger.debug("[AST] 是赋值字符串: `是`")
+                        logger.debug("[AST] Is assign string: `Yes`")
                         return True, _is_co, _cp, chain
                     elif _is_co == 3:
                         pass
                         # logger.info("[AST] can't find this param, Unconfirmed vulnerable..")
                         # return True, _is_co, _cp, chain
                     elif _is_co == 4:
-                        logger.info("[AST] 新的危险函数 {}()".format(_cp[0].name))
+                        logger.info("[AST] New vul function {}()".format(_cp[0].name))
                         return False, _is_co, tuple([_is_co, _cp]), chain
                     else:
                         continue
@@ -269,7 +269,7 @@ class CAST(object):
                     regex_assign_string = self.regex[self.language]['assign_string'].format(re.escape(param_name))
                     string = re.findall(regex_assign_string, param_block_code)
                     if len(string) >= 1 and string[0] != '':
-                        logger.debug("[AST] 是赋值字符串: `是`")
+                        logger.debug("[AST] Is assign string: `Yes`")
                         continue
                         # return False, self.data
                     logger.debug("[AST] Is assign string: `No`")
@@ -286,15 +286,15 @@ class CAST(object):
 
                 elif self.language == "javascript":
 
-                    logger.debug("[AST] 是变量: `是`")
-                    logger.debug("[Deep AST] 开始对参数 {param_name} 进行 AST 分析".format(param_name=param_name))
+                    logger.debug("[AST] Is variable: `Yes`")
+                    logger.debug("[Deep AST] Start AST for param {param_name}".format(param_name=param_name))
 
                     _is_co, _cp, expr_lineno, chain = js_analysis_params(param_name, [],
                                                                          self.sr.vul_function, self.line, self.file_path,
                                                                          self.repair_functions, self.controlled_list, isexternal=True)
 
                     if _is_co == 1:
-                        logger.debug("[AST] 是赋值字符串: `是`")
+                        logger.debug("[AST] Is assign string: `Yes`")
                         return True, _is_co, _cp, chain
                     elif _is_co == 3:
                         pass
@@ -302,9 +302,9 @@ class CAST(object):
                         # return True, _is_co, _cp, chain
                     elif _is_co == 4:
                         if hasattr(_cp[0], "name"):
-                            logger.info("[AST] 新的危险函数 {}()".format(_cp[0].name))
+                            logger.info("[AST] New vul function {}()".format(_cp[0].name))
                         else:
-                            logger.info("[AST] 新的危险函数 {}()".format(_cp[0]))
+                            logger.info("[AST] New vul function {}()".format(_cp[0]))
 
                         return False, _is_co, tuple([_is_co, _cp]), chain
 

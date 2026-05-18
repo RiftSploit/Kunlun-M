@@ -97,7 +97,7 @@ class Pretreatment:
         if lan is not None:
             # 检查是否在可ast pasre列表中
             if not list(set(lan).intersection(set(could_ast_pase_lans))):
-                logger.info("[AST][Pretreatment] 当前扫描目标语言不需要 AST 预处理...")
+                logger.info("[AST][Pretreatment] Current scan target language does not require ast pretreatment...")
                 return True
 
         for fileext in self.file_list:
@@ -279,11 +279,11 @@ class Pretreatment:
                         self.pre_result[filepath]['target_files_path'] = target_files_path
 
                     except zipfile.BadZipFile:
-                        logger.warning("[预处理][Chrome 扩展] 文件 {} 不是 zip 格式".format(filepath))
+                        logger.warning("[Pretreatment][Chrome Ext] file {} not zip".format(filepath))
                         continue
 
                     except OSError:
-                        logger.warning("[预处理][Chrome 扩展] 文件 {} 解压失败".format(filepath))
+                        logger.warning("[Pretreatment][Chrome Ext] file {} unzip error".format(filepath))
                         continue
 
                     # 分析manifest.json
@@ -317,7 +317,7 @@ class Pretreatment:
 
                         # 想办法优化，如果不想深入js和html的判断，那么就跳过
                         if len(self.lan) and self.lan == 'chromeext':
-                            logger.debug("[预处理][Chrome 扩展] 跳过 js 和 html 扫描...")
+                            logger.debug("[Pretreatment][Chrome Ext] pass js & html scan...")
                             continue
 
                         # content scripts
@@ -367,7 +367,7 @@ class Pretreatment:
                             self.target_queue.put(('.html', {'count': len(child_files_html), 'list': child_files_html}))
 
                     else:
-                        logger.warning("[预处理][Chrome 扩展] 文件 {} 解析失败...".format(target_files_path))
+                        logger.warning("[Pretreatment][Chrome Ext] File {} parse error...".format(target_files_path))
                         continue
 
             elif fileext[0] in ext_dict['html'] and 'javascript' in self.lan:
@@ -519,7 +519,7 @@ class Pretreatment:
             return self.pre_result[os.path.join(self.target_directory, filepath)]['ast_nodes']
 
         else:
-            logger.warning("[AST] 文件 {} 未找到解析器...".format(filepath))
+            logger.warning("[AST] file {} parser not found...".format(filepath))
             return False
 
     def get_content(self, filepath):
@@ -533,7 +533,7 @@ class Pretreatment:
             return content
 
         else:
-            logger.warning("[AST] 文件 {} 未找到解析器...".format(filepath))
+            logger.warning("[AST] file {} parser not found...".format(filepath))
             return False
 
     def get_object(self, filepath):
@@ -542,7 +542,7 @@ class Pretreatment:
         if filepath in self.pre_result:
             return self.pre_result[filepath]
         else:
-            logger.warning("[AST] 文件 {} 未找到对象...".format(filepath))
+            logger.warning("[AST] file {} object not found...".format(filepath))
             return False
 
     def get_child_files(self, filepath):
@@ -556,7 +556,7 @@ class Pretreatment:
             return self.pre_result[os.path.join(self.target_directory, filepath)]['child_files']
 
         else:
-            logger.warning("[AST] 文件 {} 未找到对象或子文件...".format(filepath))
+            logger.warning("[AST] file {} object or child files not found...".format(filepath))
             return False
 
     def get_define(self, define_name):
@@ -564,7 +564,7 @@ class Pretreatment:
             return self.define_dict[define_name]
 
         else:
-            logger.warning("[AST] [INCLUDE FOUND] 无法找到常量 {}，跳过 ".format(define_name))
+            logger.warning("[AST] [INCLUDE FOUND] Can't found this constart {}, pass it ".format(define_name))
             return "not_found"
 
 

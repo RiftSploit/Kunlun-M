@@ -186,7 +186,7 @@ def main():
 
         # 插件需要提前声明
         if hasattr(args, "plugin_name") and args.plugin_name:
-            logger.info('[INIT] 加载插件 {}。'.format(args.plugin_name))
+            logger.info('[INIT] Load Plugin {}.'.format(args.plugin_name))
             plugins.PLUGIN_DICT[args.plugin_name](parser, parser_group_plugin)
             exit()
 
@@ -198,46 +198,46 @@ def main():
 
         if hasattr(args, "init"):
             if args.init == 'checksql':
-                logger.info('显示迁移 SQL。')
+                logger.info('Show migrate sql.')
                 call_command('sqlmigrate', args.appname, args.migrationname)
             else:
-                logger.info('初始化 KunLun-M 数据库。')
+                logger.info('Init Database for KunLun-M.')
                 call_command('makemigrations')
                 call_command('migrate')
-                logger.info('数据库初始化完成。')
+                logger.info('Init Database Finished.')
             exit()
 
         if hasattr(args, "port"):
-            logger.info('启动 KunLun-M Web 服务，端口: {}'.format(args.port))
+            logger.info('Start KunLun-M Web in Port: {}'.format(args.port))
             call_command('runserver', args.port)
 
         if hasattr(args, "load"):
             if args.load == "load":
-                logger.info("[INIT] 规则检查开始。")
+                logger.info("[INIT] RuleCheck start.")
                 RuleCheck().load()
 
-                logger.info("[INIT] 规则检查完成。")
+                logger.info("[INIT] RuleCheck finished.")
                 exit()
 
             elif args.load == "recover":
-                logger.info("[INIT] 规则恢复开始。")
+                logger.info("[INIT] RuleRecover start.")
                 RuleCheck().recover()
 
-                logger.info("[INIT] 规则恢复完成。")
+                logger.info("[INIT] RuleRecover finished.")
                 exit()
 
             elif args.load == "loadtamper":
-                logger.info("[INIT] 篡改规则检查开始。")
+                logger.info("[INIT] TamperCheck start.")
                 TamperCheck().load()
 
-                logger.info("[INIT] 篡改规则检查完成。")
+                logger.info("[INIT] TamperCheck finished.")
                 exit()
 
             elif args.load == "retamper":
-                logger.info("[INIT] 篡改规则恢复开始。")
+                logger.info("[INIT] TamperRecover start.")
                 TamperCheck().recover()
 
-                logger.info("[INIT] 篡改规则恢复完成。")
+                logger.info("[INIT] TamperRecover finished.")
                 exit()
 
             else:
@@ -262,11 +262,11 @@ def main():
                     unmatch=args.unmatch,
                     force=args.force,
                 )
-                logger.info("[INIT] 生成规则 CVI_{}: {}".format(rid, rule_path))
+                logger.info("[INIT] Generated rule CVI_{}: {}".format(rid, rule_path))
                 if args.sync:
-                    logger.info("[INIT] 规则检查开始。")
+                    logger.info("[INIT] RuleCheck start.")
                     RuleCheck().load()
-                    logger.info("[INIT] 规则检查完成。")
+                    logger.info("[INIT] RuleCheck finished.")
                 exit()
 
             if args.generate_type == "tamper":
@@ -279,16 +279,16 @@ def main():
                     controlled=args.controlled,
                     force=args.force,
                 )
-                logger.info("[INIT] 生成篡改规则 {}: {}".format(args.tamper_name, tamper_path))
+                logger.info("[INIT] Generated tamper {}: {}".format(args.tamper_name, tamper_path))
                 if args.sync:
-                    logger.info("[INIT] 篡改规则检查开始。")
+                    logger.info("[INIT] TamperCheck start.")
                     TamperCheck().load()
-                    logger.info("[INIT] 篡改规则检查完成。")
+                    logger.info("[INIT] TamperCheck finished.")
                 exit()
 
         if hasattr(args, "list"):
             if args.list:
-                logger.info("展示 {}:\n{}".format(args.list, show_info(args.list, args.listkey.strip(""))))
+                logger.info("Show {}:\n{}".format(args.list, show_info(args.list, args.listkey.strip(""))))
                 exit()
             else:
                 parser_group_show.print_help()
@@ -297,7 +297,7 @@ def main():
         if hasattr(args, "stype"):
             # search and show vuls
             if args.stype:
-                logger.info("[SEARCH] 通过 {} 搜索项目，在 {} {}".format(args.stype, args.keyword_name, args.keyword_value))
+                logger.info("[SEARCH] Search Project by {} in {} {}".format(args.stype, args.keyword_name, args.keyword_value))
                 cli.search_project(args.stype, args.keyword_name, args.keyword_value, args.with_vuls)
                 exit()
             else:
@@ -306,17 +306,17 @@ def main():
 
         if hasattr(args, "console"):
             # check rule and tamper
-            logger.info("[INIT] 规则检查开始。")
+            logger.info("[INIT] RuleCheck start.")
             RuleCheck().load()
 
-            logger.info("[INIT] 规则检查完成。")
+            logger.info("[INIT] RuleCheck finished.")
 
             logger.info("[INIT] TamperCheck start.")
             TamperCheck().load()
 
             logger.info("[INIT] TamperCheck finished.")
 
-            logger.info("[INIT] 进入 KunLun-M 控制台模式。")
+            logger.info("[INIT] Enter KunLun-M console mode.")
             shell = KunlunInterpreter()
             shell.start()
             exit()
@@ -329,8 +329,8 @@ def main():
         if hasattr(args, "api") and args.api:
             log_rm()
 
-        logger.debug('[INIT] 开始扫描任务...')
-        logger.debug('[INIT] 设置日志级别: {}'.format(logger.level))
+        logger.debug('[INIT] start Scan Task...')
+        logger.debug('[INIT] set logging level: {}'.format(logger.level))
 
         # check for project data
         if hasattr(args, "origin") and args.origin:
@@ -341,11 +341,11 @@ def main():
         if hasattr(args, "task_id") and args.task_id:
             s = ScanTask.objects.filter(id=int(args.task_id)).first()
             if not s:
-                logger.warning("[INIT] ScanTask {} 未找到。".format(args.task_id))
+                logger.warning("[INIT] ScanTask {} not found.".format(args.task_id))
                 exit()
 
             if int(s.is_finished) == 1:
-                logger.info("[INIT] 任务完成。")
+                logger.info("[INIT] Finished Task.")
                 exit()
 
             s.target_path = args.target
@@ -358,14 +358,14 @@ def main():
             check_and_new_project_id(s.id, s.task_name, origin, project_des=args.description)
         else:
             if args.newpro:
-                logger.info('[INIT] 使用新项目进行扫描任务。')
+                logger.info('[INIT] Use new project for scan task.')
                 task_name = random_generator(16)
             else:
                 task_name = get_mainstr_from_filename(args.target)
             s = cli.check_scantask(task_name=task_name, target_path=args.target, parameter_config=sys.argv, project_origin=origin, project_des=args.description, auto_yes=args.yes)
 
             if int(s.is_finished) == 1:
-                logger.info("[INIT] 任务完成。")
+                logger.info("[INIT] Finished Task.")
                 exit()
 
         # 标识任务id
@@ -379,13 +379,13 @@ def main():
             result_url = "{}dashboard/tasks/detail/{}?token={}".format(REMOTE_URL, s.id, s.visit_token)
             print("Result Url: {}".format(result_url))
         else:
-            logger.info("任务ID: {}".format(task_id))
+            logger.info("TaskID: {}".format(task_id))
 
         if hasattr(args, "log") and args.log:
-            logger.info("[INIT] 新建日志文件 {}.log。".format(args.log))
+            logger.info("[INIT] New Log file {}.log .".format(args.log))
             log_name = args.log
         else:
-            logger.info("[INIT] 新建日志文件 ScanTask_{}.log。".format(sid))
+            logger.info("[INIT] New Log file ScanTask_{}.log .".format(sid))
             log_name = "ScanTask_{}".format(sid)
 
         log_add(logging.DEBUG, log_name)
@@ -394,7 +394,7 @@ def main():
             # 共享变量
             import Kunlun_M.settings as settings
             settings.WITH_VENDOR = False if args.without_vendor else settings.WITH_VENDOR
-            logger.info("[INIT] 组件漏洞扫描状态: {}".format(settings.WITH_VENDOR))
+            logger.info("[INIT] Vendor Vuls Scan Status: {}".format(settings.WITH_VENDOR))
 
         data = {
             'status': 'running',
@@ -431,10 +431,10 @@ def main():
 
             upload_log(log_path)
 
-        logger.info('[INIT] 完成！耗时:{ct}秒'.format(ct=t2 - t1))
+        logger.info('[INIT] Done! Consume Time:{ct}s'.format(ct=t2 - t1))
 
     except KeyboardInterrupt:
-        logger.warning("[KunLun-M] 停止 KunLun-M。")
+        logger.warning("[KunLun-M] Stop KunLun-M.")
         sys.exit(0)
 
     except Exception as e:

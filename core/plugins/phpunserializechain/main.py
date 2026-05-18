@@ -118,19 +118,19 @@ class PhpUnSerChain(BasePluginClass):
                 new_locate = node.node_locate + '.' + node.source_node
                 method_body_nodes = self.dataflow_db.objects.filter(node_locate__startswith=new_locate).order_by('node_sort', 'id')
 
-                logger.info("[PHP反序列化链] 新链起始 {} 在 {}".format(method_prefix, node.node_locate))
+                logger.info("[PhpUnSerChain] New Chain Start in {} in {}".format(method_prefix, node.node_locate))
                 self.current_chain_relations = []
                 self.current_chain_properties = []
                 status = self.deep_search_chain(method_body_nodes, class_locate, unserchain)
 
                 if status:
-                    logger.info("[PHP反序列化链] 新源 {}{} 在 {}".format(method_prefix, node.sink_node, node.node_locate))
+                    logger.info("[PhpUnSerChain] New Source {}{} in {}".format(method_prefix, node.sink_node, node.node_locate))
 
                     for unsernode in unserchain:
                         logger.info("{}".format(unsernode.node_locate.ljust(100, ' ')))
                         logger_console.warn("{}   {}{}".format(unsernode.node_type.ljust(30, ' '), unsernode.source_node,
                                                                self.deep_get_node_name(unsernode.sink_node)))
-                    logger.info("[PHP反序列化链] 反序列化链可用。")
+                    logger.info("[PhpUnSerChain] UnSerChain is available.")
                     self.record_available_chain(unserchain, self.current_chain_relations, self.current_chain_properties, entry_locate=class_locate)
 
     def get___get(self, var_name, unserchain=[], define_param=(), deepth=0):
@@ -141,7 +141,7 @@ class PhpUnSerChain(BasePluginClass):
         deepth += 1
         define_param = (var_name, *define_param)
         get_nodes = self.dataflow_db.objects.filter(node_type='newMethod', source_node__startswith='Method-__get')
-        logger.debug("[PHP反序列化链] 触发 __get('{}')，尝试查找。".format(var_name))
+        logger.debug("[PhpUnSerChain] trigger __get('{}'). try to found it.".format(var_name))
 
         for node in get_nodes:
             logger.debug("[PhpUnSerChain] Found New __get{} in {}".format(node.sink_node, node.node_locate))
@@ -348,7 +348,7 @@ class PhpUnSerChain(BasePluginClass):
                         logger_console.warn(
                             "{}   {}{}".format(unsernode.node_type.ljust(30, ' '), unsernode.source_node,
                                                self.deep_get_node_name(unsernode.sink_node)))
-                    logger.info("[PHP反序列化链] 反序列化链可用。")
+                    logger.info("[PhpUnSerChain] UnSerChain is available.")
                     self.record_available_chain(unserchain, self.current_chain_relations, self.current_chain_properties, entry_locate=class_locate)
                 else:
                     unserchain.extend(newunserchain)

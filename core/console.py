@@ -76,7 +76,7 @@ def save_history():
     try:
         readline.write_history_file(history_path)
     except IOError as msg:
-        warn_msg = "写入历史文件 '{0}' 时出现问题 ({1})".format(history_path, msg)
+        warn_msg = "there was a problem writing the history file '{0}' ({1})".format(history_path, msg)
         logger.warn(warn_msg)
 
 
@@ -92,7 +92,7 @@ def load_history():
         try:
             readline.read_history_file(history_path)
         except IOError as msg:
-            warn_msg = "加载历史文件 '{0}' 时出现问题 ({1})".format(history_path, msg)
+            warn_msg = "there was a problem loading the history file '{0}' ({1})".format(history_path, msg)
             logger.warn(warn_msg)
 
 
@@ -173,7 +173,7 @@ class BaseInterpreter(object):
         try:
             command_handler = getattr(self, "command_{}".format(command))
         except AttributeError:
-            logger.error("[Console] 未知命令: '{}'".format(command))
+            logger.error("Unknown command: '{}'".format(command))
             return None
 
         return command_handler
@@ -193,10 +193,10 @@ class BaseInterpreter(object):
                     continue
                 command_handler(args)
             except EOFError:
-                logger.info("[Console] KunLun-M 控制台模式已停止")
+                logger.info("KunLun-M Console mode stopped")
                 break
             except KeyboardInterrupt:
-                logger.info("[Console] 控制台已退出")
+                logger.info("Console Exit")
                 break
             except:
                 logger.error("[Console] {}".format(traceback.format_exc()))
@@ -517,11 +517,11 @@ class KunlunInterpreter(BaseInterpreter):
 
                     index += 1
 
-            logger.info("[Console] 显示扫描任务列表:\n{}".format(sts_table))
+            logger.info("[Console] Show Scan Task list:\n{}".format(sts_table))
 
-            logger.warn("[Console] 现在可以输入 N 显示下 10 个任务。")
+            logger.warn("[Console] Now You can Enter N show Next 10 Tasks.")
         else:
-            logger.warn("[Console] 当前没有扫描任务。")
+            logger.warn("[Console] Now have no Scan Task.")
 
     def command_showt(self, *args, **kwargs):
         self.current_mode = 'showt'
@@ -530,7 +530,7 @@ class KunlunInterpreter(BaseInterpreter):
 
     def command_n(self, *args, **kwargs):
         if self.current_mode not in self.show_mode_list:
-            logger.warn("[Console] 命令 N 仅用于显示模式。")
+            logger.warn("[Console] Command N only for show mode.")
             return
 
         if self.current_mode == 'showt':
@@ -561,7 +561,7 @@ class KunlunInterpreter(BaseInterpreter):
             vul_function = file_output_format(rule.vul_function)
             main_function = rule.main_function
 
-            logger.info("[Console] 规则 CVI_{} 详情:\n{}".format(svid, template_file_content.format(
+            logger.info("[Console] Rule CVI_{} Detail:\n{}".format(svid, template_file_content.format(
                 rule_name=rule_name, svid=svid, language=language,
                 author=author, description=description, level=level, status=status,
                 match_mode=match_mode, match=match,
@@ -571,18 +571,18 @@ class KunlunInterpreter(BaseInterpreter):
                 vul_function=vul_function,
                 main_function=main_function)))
 
-            logger.warn("[Console] 可以通过命令 'config rule <rule_id>' 编辑规则")
+            logger.warn("[Console] You can edit the Rule by command 'config rule <rule_id>'")
             return
 
         else:
-            logger.error("[Console] 请检查规则 ID 或使用命令 'show rule' 查看")
+            logger.error("[Console] Please check Rule id or or use the command 'show rule' to view")
 
     def load_rule_dict_by_id(self, rule_id):
         rule = Rules.objects.filter(svid=rule_id).first()
         # rule_dict = {}
 
         if not rule:
-            logger.error("[Console] 请检查规则 ID 或使用命令 'show rule' 查看")
+            logger.error("[Console] Please check Rule id or or use the command 'show rule' to view")
             return False
 
         return rule
@@ -622,13 +622,13 @@ class KunlunInterpreter(BaseInterpreter):
                 vul_function=rule_dict['vul_function'],
                 main_function=rule_dict['main_function'])
 
-            logger.info("[Console] 规则 CVI_{} 详情:\n{}".format(rule_dict['svid'], self.rule_filecontent))
+            logger.info("[Console] Rule CVI_{} Detail:\n{}".format(rule_dict['svid'], self.rule_filecontent))
 
-            logger.warn("[Console] 当前是临时文件，必须使用命令 'save' 保存")
+            logger.warn("[Console] This is currently a temporary file, you must use Command 'save' to save")
             return
 
         else:
-            logger.error("[Console] 请检查规则 ID 或使用命令 'show rule' 查看")
+            logger.error("[Console] Please check Rule id or or use the command 'show rule' to view")
 
     def show_tamper_by_dict(self, tamper_dict):
         if tamper_dict:
@@ -646,11 +646,11 @@ Input Control:
 {}
 """.format(self.config_keyword, pprint.pformat(filter_func, indent=4), pprint.pformat(input_control, indent=4)))
 
-            logger.warn("[Console] 当前是临时文件，必须使用命令 'save' 保存")
+            logger.warn("[Console] This is currently a temporary file, you must use Command 'save' to save")
             return
 
         else:
-            logger.error("[Console] 未找到篡改规则，请检查命令或执行 config load。")
+            logger.error("[Console] Not Found Tampers, Please check command or execute config load.")
 
     def save_rule_to_file(self):
         """
@@ -668,7 +668,7 @@ Input Control:
 
         rule_path = os.path.join(rule_lan_path, "CVI_{}.py".format(svid))
 
-        logger.info("[Console] 新规则文件 CVI_{}.py 已初始化。".format(svid))
+        logger.info("[Console] new Rule file CVI_{}.py init.".format(svid))
 
         rule_file = codecs.open(rule_path, "wb+", encoding='utf-8', errors='ignore')
 
@@ -679,7 +679,7 @@ Input Control:
     def get_scan_results_by_config(self):
 
         project_id = get_and_check_scantask_project_id(self.result_task_id)
-        logger.info("任务 {} 属于项目 {}。".format(self.result_task_id, project_id))
+        logger.info("Task {} belong Project {}.".format(self.result_task_id, project_id))
 
         srs = get_and_check_scanresult(self.result_task_id).objects.filter(scan_project_id=project_id)
         orm_limit = {}
@@ -720,7 +720,7 @@ Input Control:
     def get_new_evil_func(self, option_name=None, option_value=None):
 
         project_id = get_and_check_scantask_project_id(self.result_task_id)
-        logger.info("任务 {} 属于项目 {}。".format(self.result_task_id, project_id))
+        logger.info("Task {} belong Project {}.".format(self.result_task_id, project_id))
 
         nfs = NewEvilFunc.objects.filter(project_id=project_id)
         orm_limit = {}
@@ -754,14 +754,14 @@ Input Control:
         for option_name in self.scan_options:
             if option_name in self.scan_required_options_list:
                 if not self.scan_options[option_name]:
-                    logger.error("[Console] 选项 {} 是必填项。扫描前必须设置。".format(option_name))
+                    logger.error("[Console] Option {} is a required option.You must set it before scanning.".format(option_name))
                     return False
 
                 if option_name == 'target':
                     target = self.scan_options[option_name]
 
                     if not os.path.exists(target):
-                        logger.error("[Console] 目标 {} 不存在。".format(target))
+                        logger.error("[Console] Target {} is not exist.".format(target))
                         return False
 
             # all不需要专门限制
@@ -804,7 +804,7 @@ Input Control:
 
     def command_get(self, *args, **kwargs):
         if self.show_mode not in self.show_mode_list:
-            logger.warn("[Console] 命令 show 仅用于显示模式")
+            logger.warn("[Console] Command Show only for show mode")
             return
 
         if self.show_mode == 'rule':
@@ -814,11 +814,11 @@ Input Control:
                 key = param[0]
                 self.show_rule_by_id(key)
             else:
-                logger.error("[Console] 必须指定规则 ID。例如: get 1001")
+                logger.error("[Console] You must specify the rule id. e.g.: get 1001")
 
     def command_set(self, *args, **kwargs):
         if self.current_mode not in ['config', 'result', 'scan']:
-            logger.warn("[Console] 命令 set 仅用于 config/result/scan 模式")
+            logger.warn("[Console] Command set only for config/result/scan mode")
             return
 
         if self.current_mode == 'config':
@@ -826,7 +826,7 @@ Input Control:
                 param = self.clear_args(args[0])
 
                 if len(param) < 2:
-                    logger.error("[Console] 必须设置选项名和值。例如: set status False")
+                    logger.error("[Console] you must set option name and value. e.g.: set status False")
                     return
 
                 option_name = param[0]
@@ -835,27 +835,27 @@ Input Control:
                 option_value = ast.literal_eval(option_value) if option_value in ['True', 'False', 'None'] else option_value
 
                 if option_name not in self.configurable_options:
-                    logger.warn("[Console] 无法编辑选项 {}。".format(option_name))
+                    logger.warn("[Console] You can't edit option {}.".format(option_name))
                     return
 
                 # load last profile
                 if getattr(self.config_obj, option_name) == option_value:
-                    logger.warn("[Console] 设置的选项未变更。")
+                    logger.warn("[Console] The options you set have not been changed.")
                     return
 
                 self.last_config[option_name] = getattr(self.config_obj, option_name)
                 # self.config_dict[option_name] = option_value
                 setattr(self.config_obj, option_name, option_value)
 
-                logger.info("[Console] 更新 {}={}。使用 'showit' 查看详情。".format(option_name, option_value))
-                logger.warn("[Console] 使用命令 'cancel' 取消上次设置或使用命令 'save' 保存规则。" )
+                logger.info("[Console] Update {}={}. Use 'showit' to view Detail.".format(option_name, option_value))
+                logger.warn("[Console] Use Command 'cancel' to cancel last set or Command 'save' to save rule." )
 
                 return
         elif self.current_mode == 'result':
             param = self.clear_args(args[0])
 
             if len(param) < 2:
-                logger.error("[Console] 必须设置选项名和值。例如: set active_vul all")
+                logger.error("[Console] you must set option name and value. e.g.: set active_vul all")
                 return
 
             option_name = param[0]
@@ -864,54 +864,54 @@ Input Control:
             option_list = list(self.result_option_list)
 
             if option_name not in option_list:
-                logger.error("[Console] 只能在 {} 中设置选项。".format(option_list))
+                logger.error("[Console] you can only set option in {}.".format(option_list))
                 return
 
             option_value = ast.literal_eval(option_value) if option_value in ['True', 'False'] else option_value
 
             if option_value in self.result_option_list[option_name]:
                 self.result_options[option_name] = option_value
-                logger.info("[Console] 更改显示选项 {}={}".format(option_name, option_value))
+                logger.info("[Console] Change Show options {}={}".format(option_name, option_value))
 
             elif "<" in str(self.result_option_list[option_name]):
                 self.result_options[option_name] = option_value
-                logger.info("[Console] 更改显示选项 {}={}".format(option_name, option_value))
+                logger.info("[Console] Change Show options {}={}".format(option_name, option_value))
 
             else:
-                logger.info("[Console] 仅接受来自 {} 的选项".format(self.result_option_list[option_name]))
+                logger.info("[Console] Only accept option from {}".format(self.result_option_list[option_name]))
                 return
 
         elif self.current_mode == 'scan':
             param = self.clear_args(args[0])
 
             if len(param) < 2:
-                logger.error("[Console] 必须设置选项名和值。例如: set is_debug True")
+                logger.error("[Console] you must set option name and value. e.g.: set is_debug True")
                 return
 
             option_name = param[0]
             option_value = param[1]
 
             if option_name not in list(self.scan_options):
-                logger.error("[Console] 只能在 {} 中设置选项。".format(list(self.scan_options)))
+                logger.error("[Console] you can only set option in {}.".format(list(self.scan_options)))
                 return
 
             option_value = ast.literal_eval(option_value) if option_value in ['True', 'False', 'None'] else option_value
 
             if option_value in self.scan_option_list[option_name]:
                 self.scan_options[option_name] = option_value
-                logger.info("[Console] 更改显示选项 {}={}".format(option_name, option_value))
+                logger.info("[Console] Change Show options {}={}".format(option_name, option_value))
 
             elif "<" in str(self.scan_option_list[option_name]):
                 self.scan_options[option_name] = option_value
-                logger.info("[Console] 更改显示选项 {}={}".format(option_name, option_value))
+                logger.info("[Console] Change Show options {}={}".format(option_name, option_value))
 
             else:
-                logger.info("[Console] 仅接受来自 {} 的选项".format(self.scan_option_list[option_name]))
+                logger.info("[Console] Only accept option from {}".format(self.scan_option_list[option_name]))
                 return
 
     def command_add(self, *args, **kwargs):
         if self.current_mode not in ['config']:
-            logger.warn("[Console] 命令 add 仅用于配置模式")
+            logger.warn("[Console] Command add only for config mode")
             return
 
         if self.current_mode == 'config':
@@ -919,7 +919,7 @@ Input Control:
                 param = self.clear_args(args[0])
 
                 if len(param) < 2:
-                    logger.error("[Console] 必须设置选项名和值。例如: set status False")
+                    logger.error("[Console] you must set option name and value. e.g.: set status False")
                     return
 
                 option_name = param[0]
@@ -931,13 +931,13 @@ Input Control:
                     self.config_dict['input_control'].append(option_value)
                     self.last_config['input_control'].append(option_value)
 
-                    logger.info("[Console] 为 {} 添加新输入控制篡改规则 {}".format(self.config_keyword, option_value))
+                    logger.info("[Console] Add New Tamper for {} New Input-Control {}".format(self.config_keyword, option_value))
                 else:
                     if option_name in self.config_dict['filter_func']:
 
                         # check exist
                         if int(option_value) in self.config_dict['filter_func'][option_name]:
-                            logger.error("[Console] {} 的新 filter_function 篡改规则已存在。".format(self.config_keyword))
+                            logger.error("[Console] New Tamper for {} New filter_function exists.".format(self.config_keyword))
                             return
                         else:
                             self.config_dict['filter_func'][option_name].append(int(option_value))
@@ -950,21 +950,21 @@ Input Control:
                     else:
                         self.last_config['filter_func'][option_name] = [int(option_value)]
 
-                    logger.info("[Console] 为 {} 添加新 filter_func 篡改规则 {} 值为 {}".format(self.config_keyword, option_name, option_value))
+                    logger.info("[Console] Add New Tamper for {} New filter_func {} for {}".format(self.config_keyword, option_name, option_value))
                 return
 
     def command_cancel(self, *args, **kwargs):
         if self.current_mode not in ['config']:
-            logger.warn("[Console] 命令 cancel 仅用于配置模式")
+            logger.warn("[Console] Command cancel only for config mode")
             return
 
         if self.current_mode == 'config':
             if self.config_mode == 'rule':
                 if not self.last_config:
-                    logger.error("[Console] 未找到已保存的配置。")
+                    logger.error("[Console] No saved last configuration found.")
 
                 for option_name in self.last_config:
-                    logger.info("[Console] 恢复配置 {}={}".format(option_name, self.last_config[option_name]))
+                    logger.info("[Console] Restore config {}={}".format(option_name, self.last_config[option_name]))
                     # self.config_dict[option_name] = self.last_config[option_name]
                     setattr(self.config_obj, option_name, self.last_config[option_name])
 
@@ -973,16 +973,16 @@ Input Control:
 
             elif self.config_mode == 'tamper':
                 if not self.last_config:
-                    logger.error("[Console] 未找到已保存的配置。")
+                    logger.error("[Console] No saved last configuration found.")
 
                 for option_name in self.last_config['filter_func']:
                     for option_value in self.last_config['filter_func'][option_name]:
 
-                        logger.info("[Console] 恢复 filter_func 篡改规则 {} 为 {}".format(option_name, option_value))
+                        logger.info("[Console] Restore filter_func tamper {} for {}".format(option_name, option_value))
                         self.config_dict['filter_func'][option_name].remove(int(option_value))
 
                 for option_value in self.last_config['input_control']:
-                    logger.info("[Console] 恢复输入控制篡改规则 {}".format(option_value))
+                    logger.info("[Console] Restore Input-Control tamper {}".format(option_value))
                     self.config_dict['input_control'].remove(option_value)
 
                 self.last_config['filter_func'] = {}
@@ -991,7 +991,7 @@ Input Control:
 
     def command_save(self, *args, **kwargs):
         if self.current_mode not in ['config']:
-            logger.warn("[Console] 命令 set 仅用于配置模式")
+            logger.warn("[Console] Command set only for config mode")
             return
 
         if self.current_mode == 'config':
@@ -1005,7 +1005,7 @@ Input Control:
                 self.config_obj.save()
                 self.save_rule_to_file()
 
-                logger.info("[Console] 规则 CVI_{} 的变更已保存。".format(self.config_obj.svid))
+                logger.info("[Console] Rule CVI_{} change has be saved.".format(self.config_obj.svid))
                 return
 
             elif self.config_mode == 'tamper':
@@ -1024,22 +1024,22 @@ Input Control:
                         # 没有的话就要新加
                         t2 = Tampers(tam_name=self.config_keyword, tam_key=option_name, tam_value=self.config_dict['filter_func'][option_name], tam_type='Filter-Function')
                         t2.save()
-                logger.info("[Console] 新篡改规则 {} 已保存。".format(self.config_keyword))
+                logger.info("[Console] New Tamper {} has be saved.".format(self.config_keyword))
                 return
 
     def command_del(self, *args, **kwargs):
         if self.current_mode not in ['result']:
-            logger.warn("[Console] 命令 del 仅用于结果模式")
+            logger.warn("[Console] Command del only for result mode")
             return
 
         param = self.clear_args(args[0])
         if len(param) < 2:
-            logger.error("[Console] 命令 del 需要设置 'mod' 和 'id'。例如: del vuls 1")
+            logger.error("[Console] Command Del need to set 'mod' and 'id'.e.g.: del vuls 1")
 
         mod = param[0]
 
         if mod not in ['vuls', 'newevilfunc']:
-            logger.error("[Console] 命令 show 需要设置为 ['vuls', 'newevilfunc'] 之一。")
+            logger.error("[Console] Command Show need to set in ['vuls', 'newevilfunc'].")
             return
 
         result_id = param[1]
@@ -1048,12 +1048,12 @@ Input Control:
 
             sr = get_and_check_scanresult(self.result_task_id).objects.filter(scan_project_id=project_id, id=result_id, is_active=True).first()
             if sr:
-                logger.info("[Console] 删除 ScanTask {} 的 id {}。".format(self.result_task_id, result_id))
+                logger.info("[Console] Delete ScanTask {} id {}.".format(self.result_task_id, result_id))
 
                 sr.is_active = False
                 sr.save()
             else:
-                logger.error("[Console] ScanTask {} 未找到 id {}。请通过命令 'show vuls all' 检查结果 ID。".format(self.result_task_id, result_id))
+                logger.error("[Console] ScanTask {} not found id {}. please check the result id by Command 'show vuls all'.".format(self.result_task_id, result_id))
                 return
 
         elif mod == 'newevilfunc':
@@ -1061,12 +1061,12 @@ Input Control:
 
             nf = NewEvilFunc.objects.filter(project_id=project_id, id=result_id, is_active=True).first()
             if nf:
-                logger.info("[Console] 删除 NewEvilFunc {} 的 id {}。".format(self.result_task_id, result_id))
+                logger.info("[Console] Delete NewEvilFunc {} id {}.".format(self.result_task_id, result_id))
 
                 nf.is_active = False
                 nf.save()
             else:
-                logger.error("[Console] NewEvilFunc {} 未找到 id {}。请通过命令 'show newevilfunc all' 检查结果 ID。".format(self.result_task_id, result_id))
+                logger.error("[Console] NewEvilFunc {} not found id {}. please check the result id by Command 'show newevilfunc all'.".format(self.result_task_id, result_id))
                 return
 
     def command_show(self, *args, **kwargs):
@@ -1078,7 +1078,7 @@ Input Control:
 
             if self.current_mode == 'root':
                 if mod not in ['rule', 'tamper']:
-                    logger.error("[Console] 命令 show 需要设置为 ['rule', 'tamper'] 之一。")
+                    logger.error("[Console] Command Show need to set in ['rule', 'tamper'].")
                     return
 
                 if mod == 'rule':
@@ -1096,7 +1096,7 @@ Input Control:
                     # check key for language
 
                     if key not in language_list:
-                        logger.error("[Console] 请在 {} 中输入关键字".format(language_list))
+                        logger.error("[Console] You should enter the Key in {}".format(language_list))
                         return
 
                     rules_table = PrettyTable(
@@ -1114,10 +1114,10 @@ Input Control:
 
                             rules_table.add_row([r.id, r.svid, r.language, level, r.rule_name, r.author, r.status, r.match_mode])
 
-                        logger.info("[Console] 显示 {} 规则:\n{}".format(key, rules_table))
-                        logger.warn("[Console] 使用命令 'get <rule_svid>' 获取规则详情")
+                        logger.info("[Console] Show {} Rules:\n{}".format(key, rules_table))
+                        logger.warn("[Console] Use Command 'get <rule_svid>' to get detail of rule")
                     else:
-                        logger.error("[Console] 未找到规则，请检查命令或执行 config load。")
+                        logger.error("[Console] Not Found Rules, Please check command or execute config load.")
 
                 if mod == 'tamper':
                     ts = Tampers.objects.values("tam_name").all()
@@ -1146,8 +1146,8 @@ Input Control:
                             tamper_table.add_row([i, tamper_name])
                             i += 1
 
-                        logger.info("[Console] 所有篡改规则:\n{}".format(tamper_table))
-                        logger.warn("[Console] 使用 'show tamper <tamper_name>' 获取篡改规则详情。")
+                        logger.info("[Console] ALL Tampers:\n{}".format(tamper_table))
+                        logger.warn("[Console] Use 'show tamper <tamper_name>' can get tamper detail.")
                     else:
                         ts = Tampers.objects.filter(tam_name=key)
 
@@ -1172,12 +1172,12 @@ Input Control:
     """.format(key, pprint.pformat(filter_func, indent=4), pprint.pformat(input_control, indent=4)))
 
                         else:
-                            logger.error("[Console] 未找到篡改规则，请检查命令或执行 config load。")
+                            logger.error("[Console] Not Found Tampers, Please check command or execute config load.")
 
                     return
             elif self.current_mode == 'result':
                 if mod not in ['vuls', 'newevilfunc', 'options']:
-                    logger.error("[Console] 命令 show 需要设置为 ['vuls', 'newevilfunc', 'options'] 之一。")
+                    logger.error("[Console] Command Show need to set in ['vuls', 'newevilfunc', 'options'].")
                     return
 
                 if mod == 'vuls':
@@ -1202,8 +1202,8 @@ Input Control:
 
                                 table.add_row(row)
 
-                            logger.info("[结果] 触发漏洞 ({vn})\r\n{table}".format(vn=len(srs), table=table))
-                            logger.warn("[Console] 使用 'show vuls <id>' 获取漏洞详情。")
+                            logger.info("[Result] Trigger Vulnerabilities ({vn})\r\n{table}".format(vn=len(srs), table=table))
+                            logger.warn("[Console] Use 'show vuls <id>' could get detail of vul.")
                         else:
                             project_id = get_and_check_scantask_project_id(self.result_task_id)
 
@@ -1220,7 +1220,7 @@ Input Control:
 
                                 table.add_row(row)
 
-                                logger.info("[结果] 扫描结果 id {}:\n{}".format(key, table))
+                                logger.info("[Result] ScanResult id {}:\n{}".format(key, table))
 
                                 # show Vuls Chain
                                 ResultFlow = get_resultflow_class(int(self.result_task_id))
@@ -1229,9 +1229,9 @@ Input Control:
                                     rfs = ResultFlow.objects.filter(vul_id=sr.id)
 
                                     if rfs:
-                                        logger.info("[链路] 漏洞 {}".format(sr.id))
+                                        logger.info("[Chain] Vul {}".format(sr.id))
                                         for rf in rfs:
-                                            logger.info("[链路] {}, {}, {}:{}".format(rf.node_type, rf.node_content,
+                                            logger.info("[Chain] {}, {}, {}:{}".format(rf.node_type, rf.node_content,
                                                                                        rf.node_path, rf.node_lineno))
                                             if not show_context(rf.node_path, rf.node_lineno):
                                                 logger_console.info(rf.node_source)

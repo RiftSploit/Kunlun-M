@@ -152,7 +152,7 @@ def init_match_rule(data):
         #     vul_function = class_name
 
     except:
-        logger.error('[新规则] 解包函数参数出错')
+        logger.error('[New Rule] Error to unpack function param, Something error')
         traceback.print_exc()
         match = None
         match2 = None

@@ -68,7 +68,7 @@ class Rule(object):
         for lan in origin_lans:
             self.rules_path = RULES_PATH + "/" + lan
             if not os.path.exists(self.rules_path):
-                logger.error("[INIT][RULE] 语言 {} 未找到规则".format(self.rules_path))
+                logger.error("[INIT][RULE] language {} can't found rules".format(self.rules_path))
                 os.mkdir(self.rules_path)
 
             self.rule_list = self.list_parse()
@@ -204,18 +204,18 @@ class RuleCheck:
         nowrule_content = str(getattr(nowrule, config)).replace(r'\"', '"')
 
         if ruleconfig_content.lower() != str(getattr(nowrule, config)).lower():
-            logger.warning("[INIT][Rule Check] CVI_{} 配置 {} 已变更:".format(svid, config))
-            logger.warning("[INIT][Rule Check] 规则文件中的 {} 为 {}".format(config, ruleconfig_content))
-            logger.warning("[INIT][Rule Check] 数据库中的 {} 为 {}".format(config, nowrule_content))
+            logger.warning("[INIT][Rule Check] CVI_{} config {} has changed:".format(svid, config))
+            logger.warning("[INIT][Rule Check] {} in Rule File is {}".format(config, ruleconfig_content))
+            logger.warning("[INIT][Rule Check] {} in Database is {}".format(config, nowrule_content))
 
             if always_load_rule_from_file:
-                logger.warning("[INIT][Rule Check] 自动从规则文件加载新 {}".format(config))
+                logger.warning("[INIT][Rule Check] automatically load new {} from Rule File".format(config))
                 setattr(nowrule, config, ruleconfig_content)
                 return True
             elif always_keep_rule_in_database:
                 return False
             else:
-                logger.warning("[INIT][Rule Check] 是否从规则文件加载新 {}(Y/N):".format(config))
+                logger.warning("[INIT][Rule Check] whether load new {} from Rule File(Y/N):".format(config))
                 if input().lower() != 'n':
                     setattr(nowrule, config, ruleconfig_content)
                     return True
@@ -281,11 +281,11 @@ class RuleCheck:
 
                 if not r:
 
-                    logger.info("[INIT][Load Rules] 新规则 CVI_{} {}".format(ruleclass.svid, ruleclass.vulnerability))
+                    logger.info("[INIT][Load Rules] New Rule CVI_{} {}".format(ruleclass.svid, ruleclass.vulnerability))
                     self.load_rules(ruleclass)
 
                 else:
-                    logger.info("[INIT][Load Rules] 检查规则 CVI_{} {}".format(ruleclass.svid, ruleclass.vulnerability))
+                    logger.info("[INIT][Load Rules] Check Rule CVI_{} {}".format(ruleclass.svid, ruleclass.vulnerability))
 
                     self.check_rules(ruleclass, r)
 
@@ -310,12 +310,12 @@ class RuleCheck:
             rule_path = os.path.join(rule_lan_path, "CVI_{}.py".format(svid))
 
             if os.path.exists(rule_path):
-                logger.warning("[INIT][Recover] 规则文件 CVI_{}.py 已存在。是否覆盖文件？(Y/N)".format(svid))
+                logger.warning("[INIT][Recover] Rule file CVI_{}.py exist. whether overwrite file? (Y/N)".format(svid))
 
                 if input().lower() == 'n':
                     continue
 
-            logger.info("[INIT][Recover] 恢复新规则文件 CVI_{}.py".format(svid))
+            logger.info("[INIT][Recover] Recover new Rule file CVI_{}.py".format(svid))
 
             template_file = codecs.open(os.path.join(RULES_PATH, 'rule.template'), 'rb+', encoding='utf-8', errors='ignore')
             template_file_content = template_file.read()
@@ -365,11 +365,11 @@ class TamperCheck:
         tam_value = tamperclass.tam_value
 
         if str(tam_value) != str(new_tamper_value):
-            logger.warning("[INIT][Tamper Check] {} 函数 {} 的篡改规则已变更:".format(tam_name, tam_key))
-            logger.warning("[INIT][Tamper Check] 篡改文件中的 {} 为 {}".format(tam_key, tam_value))
-            logger.warning("[INIT][Tamper Check] 数据库中的 {} 为 {}".format(tam_key, new_tamper_value))
+            logger.warning("[INIT][Tamper Check] Tamper for {} function {} has changed:".format(tam_name, tam_key))
+            logger.warning("[INIT][Tamper Check] {} in Tamper File is {}".format(tam_key, tam_value))
+            logger.warning("[INIT][Tamper Check] {} in Database is {}".format(tam_key, new_tamper_value))
 
-            logger.warning("[INIT][Tamper Check] 是否从篡改文件加载新 {}(Y/N):".format(tam_key))
+            logger.warning("[INIT][Tamper Check] whether load new {} from Tamper File(Y/N):".format(tam_key))
             if input().lower() != 'n':
                 tamperclass.tam_value = new_tamper_value
 
@@ -399,7 +399,7 @@ class TamperCheck:
                                                tam_key=function).first()
 
                     if not t:
-                        logger.info("[INIT][Load Tamper] 新增 {} 函数篡改 {}。".format(tamper_name, function))
+                        logger.info("[INIT][Load Tamper] New Tamper for {} function {}.".format(tamper_name, function))
 
                         t1 = Tampers(tam_name=tamper_name, tam_type="Filter-Function",
                                      tam_key=function, tam_value=filter_func[function])
@@ -407,7 +407,7 @@ class TamperCheck:
                         t1.save()
 
                     else:
-                        logger.info("[INIT][Load Tamper] 检查 {} 函数篡改 {}。".format(tamper_name, function))
+                        logger.info("[INIT][Load Tamper] Check Tamper for {} function {}.".format(tamper_name, function))
 
                         self.check_and_update_tamper(t, filter_func[function])
 
@@ -417,7 +417,7 @@ class TamperCheck:
                                                tam_key=tamper_name, tam_value=input).first()
 
                     if not t:
-                        logger.info("[INIT][Load Tamper] 新增 {} 输入篡改 {}。".format(tamper_name, input))
+                        logger.info("[INIT][Load Tamper] New Tamper for {} Input {}.".format(tamper_name, input))
 
                         t1 = Tampers(tam_name=tamper_name, tam_type="Input-Control",
                                      tam_key=tamper_name, tam_value=input)
@@ -425,7 +425,7 @@ class TamperCheck:
                         t1.save()
 
                     else:
-                        logger.info("[INIT][Load Tamper] 检查 {} 输入篡改 {}。".format(tamper_name, input))
+                        logger.info("[INIT][Load Tamper] Check Tamper for {} Input {}.".format(tamper_name, input))
 
                         self.check_and_update_tamper(t, input)
 
@@ -457,12 +457,12 @@ class TamperCheck:
             tamper_path = os.path.join(tampers_path, "{}.py".format(tamper_name))
 
             if os.path.exists(tamper_path):
-                logger.warning("[INIT][Recover] 篡改文件 {}.py 已存在。是否覆盖文件？ (Y/N)".format(tamper_name))
+                logger.warning("[INIT][Recover] Tamper file {}.py exist. whether overwrite file? (Y/N)".format(tamper_name))
 
                 if input().lower() == 'n':
                     continue
 
-            logger.info("[INIT][Recover] 恢复新篡改文件 {}.py".format(tamper_name))
+            logger.info("[INIT][Recover] Recover new Tamper file {}.py".format(tamper_name))
 
             template_file = codecs.open(os.path.join(RULES_PATH, 'tamper.template'), 'rb+', encoding='utf-8',
                                         errors='ignore')

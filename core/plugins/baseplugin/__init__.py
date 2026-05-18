@@ -53,7 +53,7 @@ class BasePluginClass:
         for required_argument in self.required_arguments_list:
             if not hasattr(self.args, required_argument) or not getattr(self.args, required_argument):
                 self.parser_group_plugin.print_help()
-                logger.error("[INIT][插件] 插件 {} 参数 {} 为必填项。".format(self.plugin_name, required_argument))
+                logger.error("[INIT][Plugin] Plugin {} argument {} is require.".format(self.plugin_name, required_argument))
                 exit()
 
         if hasattr(self.args, "debug") and self.args.debug:

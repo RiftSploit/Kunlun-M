@@ -175,16 +175,16 @@ def scan(target_directory, a_sid=None, s_sid=None, special_rules=None, language=
                 res.file_path = res.file_path
                 find_vulnerabilities.append(res)
         else:
-            logger.debug('[SCAN] [STORE] 未在此规则中发现漏洞!')
+            logger.debug('[SCAN] [STORE] Not found vulnerabilities on this rule!')
 
     async def start_scan(target_directory, rule, files, language, tamper_name):
         result = scan_single(target_directory, rule, files, language, tamper_name, is_unconfirm, newcore_function_list)
         store(result)
 
     if len(rules) == 0:
-        logger.critical('没有规则!')
+        logger.critical('no rules!')
         return False
-    logger.info('[推送] {rc} 条规则'.format(rc=len(rules)))
+    logger.info('[PUSH] {rc} Rules'.format(rc=len(rules)))
     push_rules = []
     scan_list = []
 
@@ -195,7 +195,7 @@ def scan(target_directory, a_sid=None, s_sid=None, special_rules=None, language=
         rule = r()
 
         if rule.status is False and len(rules) != 1:
-            logger.info('[CVI_{cvi}] [状态] 已关闭，跳过...'.format(cvi=rule.svid))
+            logger.info('[CVI_{cvi}] [STATUS] OFF, CONTINUE...'.format(cvi=rule.svid))
             continue
         # SR(Single Rule)
         logger.debug("""[PUSH] [CVI_{cvi}] {idx}.{vulnerability}({language})""".format(
@@ -360,7 +360,7 @@ class SingleRule(object):
         # new core function list
         self.newcore_function_list = newcore_function_list
 
-        logger.info("[!] 开始扫描 [CVI-{sr_id}]".format(sr_id=self.sr.svid))
+        logger.info("[!] Start scan [CVI-{sr_id}]".format(sr_id=self.sr.svid))
 
     def origin_results(self):
         logger.debug('[ENGINE] [ORIGIN] match-mode {m}'.format(m=self.sr.match_mode))
@@ -407,7 +407,7 @@ class SingleRule(object):
                     result = None
             except Exception as e:
                 traceback.print_exc()
-                logger.debug('匹配异常 ({e})'.format(e=e))
+                logger.debug('match exception ({e})'.format(e=e))
                 return None
 
         elif self.sr.match_mode == const.mm_regex_param_controllable:
@@ -422,7 +422,7 @@ class SingleRule(object):
                     result = None
             except Exception as e:
                 traceback.print_exc()
-                logger.debug('匹配异常 ({e})'.format(e=e))
+                logger.debug('match exception ({e})'.format(e=e))
                 return None
 
         elif self.sr.match_mode == const.mm_function_param_controllable:
@@ -450,7 +450,7 @@ class SingleRule(object):
                     result = None
             except Exception as e:
                 traceback.print_exc()
-                logger.debug('匹配异常 ({e})'.format(e=e))
+                logger.debug('match exception ({e})'.format(e=e))
                 return None
 
         elif self.sr.match_mode == const.mm_regex_return_regex:
@@ -471,7 +471,7 @@ class SingleRule(object):
                     result = None
             except Exception as e:
                 traceback.print_exc()
-                logger.debug('匹配异常 ({e})'.format(e=e))
+                logger.debug('match exception ({e})'.format(e=e))
                 return None
 
         elif self.sr.match_mode == const.sp_crx_keyword_match:
@@ -491,7 +491,7 @@ class SingleRule(object):
                     result = None
             except Exception as e:
                 traceback.print_exc()
-                logger.debug('匹配异常 ({e})'.format(e=e))
+                logger.debug('match exception ({e})'.format(e=e))
                 return None
 
         elif self.sr.match_mode == const.file_path_regex_match:
@@ -509,11 +509,11 @@ class SingleRule(object):
                     result = None
             except Exception as e:
                 traceback.print_exc()
-                logger.debug('匹配异常 ({e})'.format(e=e))
+                logger.debug('match exception ({e})'.format(e=e))
                 return None
 
         else:
-            logger.warning('异常匹配模式: {m}'.format(m=self.sr.match_mode))
+            logger.warning('Exception match mode: {m}'.format(m=self.sr.match_mode))
             result = None
 
         try:
@@ -531,7 +531,7 @@ class SingleRule(object):
         origin_results = self.origin_results()
         # exists result
         if origin_results == '' or origin_results is None:
-            logger.debug('[CVI-{cvi}] [ORIGIN] 未找到!'.format(cvi=self.sr.svid))
+            logger.debug('[CVI-{cvi}] [ORIGIN] NOT FOUND!'.format(cvi=self.sr.svid))
             return None
 
         origin_vulnerabilities = origin_results
@@ -539,11 +539,11 @@ class SingleRule(object):
             logger.debug(
                 '[CVI-{cvi}] [ORIGIN] {line}'.format(cvi=self.sr.svid, line=": ".join(list(origin_vulnerability))))
             if origin_vulnerability == ():
-                logger.debug(' > 继续...')
+                logger.debug(' > continue...')
                 continue
             vulnerability = self.parse_match(origin_vulnerability)
             if vulnerability is None:
-                logger.debug('非漏洞，继续...')
+                logger.debug('Not vulnerability, continue...')
                 continue
             is_test = False
             try:
@@ -568,14 +568,14 @@ class SingleRule(object):
                     is_vulnerability, reason = False, "Unpack error"
 
                 if is_vulnerability:
-                    logger.debug('[CVI-{cvi}] [RET] 发现 {code}'.format(cvi=self.sr.svid, code=reason))
+                    logger.debug('[CVI-{cvi}] [RET] Found {code}'.format(cvi=self.sr.svid, code=reason))
                     vulnerability.analysis = reason
                     vulnerability.chain = data
                     self.rule_vulnerabilities.append(vulnerability)
                 else:
                     if reason == 'New Core':  # 新的规则
 
-                        logger.debug('[CVI-{cvi}] [NEW-VUL] 新规则初始化'.format(cvi=self.sr.svid))
+                        logger.debug('[CVI-{cvi}] [NEW-VUL] New Rules init'.format(cvi=self.sr.svid))
                         new_rule_vulnerabilities = NewCore(self.sr, self.target_directory, data, self.files, 0,
                                                            languages=self.languages, tamper_name=self.tamper_name,
                                                            is_unconfirm=self.is_unconfirm,
@@ -585,10 +585,10 @@ class SingleRule(object):
                             self.rule_vulnerabilities.extend(new_rule_vulnerabilities)
 
                     else:
-                        logger.debug('非漏洞: {code}'.format(code=reason))
+                        logger.debug('Not vulnerability: {code}'.format(code=reason))
             except Exception:
                 raise
-        logger.debug('[CVI-{cvi}] {vn} 漏洞数: {count}'.format(cvi=self.sr.svid, vn=self.sr.vulnerability,
+        logger.debug('[CVI-{cvi}] {vn} Vulnerabilities: {count}'.format(cvi=self.sr.svid, vn=self.sr.vulnerability,
                                                                         count=len(self.rule_vulnerabilities)))
         return self.rule_vulnerabilities
 
@@ -604,7 +604,7 @@ class SingleRule(object):
             mr.code_content = single_match[2]
             mr.file_path = single_match[0]
         except Exception:
-            logger.warning('[ENGINE] 匹配行解析异常')
+            logger.warning('[ENGINE] match line parse exception')
             mr.file_path = ''
             mr.code_content = ''
             mr.line_number = 0
@@ -679,9 +679,9 @@ class Core(object):
         self.repair_code_third_party = 4008
 
         self.method = None
-        logger.debug("""[CVI-{cvi}] [验证漏洞] ({index})
-        > 文件: `{file}:{line}`
-        > 代码: `{code}`""".format(
+        logger.debug("""[CVI-{cvi}] [VERIFY-VULNERABILITY] ({index})
+        > File: `{file}:{line}`
+        > Code: `{code}`""".format(
             cvi=single_rule.svid,
             index=index,
             file=self.file_path,
@@ -812,7 +812,7 @@ class Core(object):
                 self.controlled_list += b
 
             except ImportError:
-                logger.warning('[AST][INIT] tamper_name 初始化错误... 未找到模块 {}'.format(self.tamper_name))
+                logger.warning('[AST][INIT] tamper_name init error... No module named {}'.format(self.tamper_name))
 
         # init
         for key in self.repair_dict:
@@ -837,18 +837,18 @@ class Core(object):
         self.status = self.status_init
         self.repair_code = self.repair_code_init
         if self.is_white_list():
-            logger.debug("[RET] 白名单")
+            logger.debug("[RET] Whitelist")
             return False, 'Whitelists(白名单)'
 
         if self.is_special_file():
-            logger.debug("[RET] 特殊文件")
+            logger.debug("[RET] Special File")
             return False, 'Special File(特殊文件)'
 
         if self.is_test_file():
-            logger.debug("[CORE] 测试文件")
+            logger.debug("[CORE] Test File")
 
         if self.is_annotation():
-            logger.debug("[RET] 注释")
+            logger.debug("[RET] Annotation")
             return False, 'Annotation(注释)'
 
         # if not self.is_target():
@@ -879,7 +879,7 @@ class Core(object):
                     # Regex-Only-Match
                     # Match(regex) -> Repair -> Done
                     #
-                    logger.debug("[CVI-{cvi}] [仅匹配]".format(cvi=self.cvi))
+                    logger.debug("[CVI-{cvi}] [ONLY-MATCH]".format(cvi=self.cvi))
                     return True, 'Regex-only-match'
 
                 # Match for function-param-regex
@@ -935,7 +935,7 @@ class Core(object):
                 param_is_controllable, code, data, chain = ast.is_controllable_param()
 
                 if param_is_controllable:
-                    logger.debug('[CVI-{cvi}] [参数可控] 参数可控'.format(cvi=self.cvi))
+                    logger.debug('[CVI-{cvi}] [PARAM-CONTROLLABLE] Param is controllable'.format(cvi=self.cvi))
 
                     if code == 1:
                         return True, 'Vustomize-Match', chain
@@ -950,7 +950,7 @@ class Core(object):
                         if int(data[0]) == 4:
                             return False, 'New Core', data[1]
 
-                    logger.debug('[CVI-{cvi}] [参数可控] 参数不可控'.format(cvi=self.cvi))
+                    logger.debug('[CVI-{cvi}] [PARAM-CONTROLLABLE] Param Not Controllable'.format(cvi=self.cvi))
                     return False, 'Param-Not-Controllable'
             except Exception as e:
                 logger.debug(traceback.format_exc())
@@ -969,14 +969,14 @@ class Core(object):
                     # Regex-Only-Match
                     # Match(regex) -> Repair -> Done
                     #
-                    logger.debug("[CVI-{cvi}] [仅匹配]".format(cvi=self.cvi))
+                    logger.debug("[CVI-{cvi}] [ONLY-MATCH]".format(cvi=self.cvi))
                     return True, 'Regex-only-match'
                 elif self.rule_match_mode == const.mm_regex_return_regex:
-                    logger.debug("[CVI-{cvi}] [正则返回正则]".format(cvi=self.cvi))
+                    logger.debug("[CVI-{cvi}] [REGEX-RETURN-REGEX]".format(cvi=self.cvi))
                     return True, 'Regex-return-regex'
                 else:
                     logger.warn(
-                        "[CVI-{cvi} [OTHER-MATCH]] solidity 规则仅支持 Regex-only-match 和 Regex-return-regex...".format(
+                        "[CVI-{cvi} [OTHER-MATCH]] sol rules only support for Regex-only-match and Regex-return-regex...".format(
                             cvi=self.cvi))
                     return False, 'Unsupport Match'
 
@@ -997,10 +997,10 @@ class Core(object):
                     # Regex-Only-Match
                     # Match(regex) -> Repair -> Done
                     #
-                    logger.debug("[CVI-{cvi}] [仅匹配]".format(cvi=self.cvi))
+                    logger.debug("[CVI-{cvi}] [ONLY-MATCH]".format(cvi=self.cvi))
                     return True, 'Regex-only-match'
                 elif self.rule_match_mode == const.mm_regex_return_regex:
-                    logger.debug("[CVI-{cvi}] [正则返回正则]".format(cvi=self.cvi))
+                    logger.debug("[CVI-{cvi}] [REGEX-RETURN-REGEX]".format(cvi=self.cvi))
                     return True, 'Regex-return-regex'
 
                     # Match for function-param-regex
@@ -1052,7 +1052,7 @@ class Core(object):
                 elif self.rule_match_mode == const.mm_regex_param_controllable:
                     param_is_controllable, code, data, chain = ast.is_controllable_param()
                     if param_is_controllable:
-                        logger.debug('[CVI-{cvi}] [参数可控] 参数可控'.format(cvi=self.cvi))
+                        logger.debug('[CVI-{cvi}] [PARAM-CONTROLLABLE] Param is controllable'.format(cvi=self.cvi))
 
                         if code == 1:
                             return True, 'Vustomize-Match', chain
@@ -1066,11 +1066,11 @@ class Core(object):
                             if int(data[0]) == 4:
                                 return False, 'New Core', data[1]
 
-                        logger.debug('[CVI-{cvi}] [参数可控] 参数不可控'.format(cvi=self.cvi))
+                        logger.debug('[CVI-{cvi}] [PARAM-CONTROLLABLE] Param Not Controllable'.format(cvi=self.cvi))
                         return False, 'Param-Not-Controllable'
 
                 else:
-                    logger.warn("[CVI-{cvi} [OTHER-MATCH]] javascript 不支持此规则...".format(cvi=self.cvi))
+                    logger.warn("[CVI-{cvi} [OTHER-MATCH]] javascript not support this rules...".format(cvi=self.cvi))
                     return False, 'Unsupport Match'
 
             except Exception as e:
@@ -1089,16 +1089,16 @@ class Core(object):
                     # Regex-Only-Match
                     # Match(regex) -> Repair -> Done
                     #
-                    logger.debug("[CVI-{cvi}] [仅匹配]".format(cvi=self.cvi))
+                    logger.debug("[CVI-{cvi}] [ONLY-MATCH]".format(cvi=self.cvi))
                     return True, 'Regex-only-match'
                 elif self.rule_match_mode == const.mm_regex_return_regex:
-                    logger.debug("[CVI-{cvi}] [正则返回正则]".format(cvi=self.cvi))
+                    logger.debug("[CVI-{cvi}] [REGEX-RETURN-REGEX]".format(cvi=self.cvi))
                     return True, 'Regex-return-regex'
                 elif self.rule_match_mode == const.sp_crx_keyword_match:
                     logger.debug("[CVI-{cvi}] [SPECIAL-CRX-KEYWORD-MATCH]".format(cvi=self.cvi))
                     return True, 'Specail-crx-keyword-match'
                 else:
-                    logger.warn("[CVI-{cvi} [OTHER-MATCH]] Chrome 扩展规则不支持...".format(cvi=self.cvi))
+                    logger.warn("[CVI-{cvi} [OTHER-MATCH]] chrome ext rules not support it...".format(cvi=self.cvi))
                     return False, 'Unsupport Match'
 
             except Exception as e:
@@ -1110,10 +1110,10 @@ class Core(object):
                 # only match
                 if self.rule_match_mode == const.mm_regex_only_match:
 
-                    logger.debug("[CVI-{cvi}] [仅匹配]".format(cvi=self.cvi))
+                    logger.debug("[CVI-{cvi}] [ONLY-MATCH]".format(cvi=self.cvi))
                     return True, 'Regex-only-match'
                 elif self.rule_match_mode == const.mm_regex_return_regex:
-                    logger.debug("[CVI-{cvi}] [正则返回正则]".format(cvi=self.cvi))
+                    logger.debug("[CVI-{cvi}] [REGEX-RETURN-REGEX]".format(cvi=self.cvi))
                     return True, 'Regex-return-regex'
 
                 elif self.rule_match_mode == const.file_path_regex_match:
@@ -1121,7 +1121,7 @@ class Core(object):
                     return True, 'file-path-regex-match'
                 else:
                     logger.warn(
-                        "[CVI-{cvi} [OTHER-MATCH]] 其他规则仅支持 Regex-only-match 和 Regex-return-regex...".format(
+                        "[CVI-{cvi} [OTHER-MATCH]] other rules only support for Regex-only-match and Regex-return-regex...".format(
                             cvi=self.cvi))
                     return False, 'Unsupport Match'
 
@@ -1156,7 +1156,7 @@ def auto_parse_match(single_match, svid, language):
         mr.code_content = single_match[2]
         mr.file_path = single_match[0]
     except Exception:
-        logger.warning('匹配行解析异常')
+        logger.warning('match line parse exception')
         mr.file_path = ''
         mr.code_content = ''
         mr.line_number = 0
@@ -1186,15 +1186,15 @@ def NewCore(old_single_rule, target_directory, new_rules, files, count=0, langua
     count += 1
 
     if count > 20:
-        logger.warning("[新规则] 深度过大，自动退出...")
+        logger.warning("[New Rule] depth too big to auto exit...")
         return False
 
     # init
     match_mode = "New rule to Vustomize-Match"
-    logger.debug('[引擎] [原始] 匹配模式 {m}'.format(m=match_mode))
+    logger.debug('[ENGINE] [ORIGIN] match-mode {m}'.format(m=match_mode))
 
     match, match2, vul_function, index, origin_func_name = init_match_rule(new_rules, lan=old_single_rule.language)
-    logger.debug('[引擎] [新规则] 新匹配规则: {}'.format(match))
+    logger.debug('[ENGINE] [New Rule] new match_rule: {}'.format(match))
 
     # 想办法传递新函数类型
     sr = autorule()
@@ -1213,7 +1213,7 @@ def NewCore(old_single_rule, target_directory, new_rules, files, count=0, langua
 
     # check vul rule exist
     if vul_function in newcore_function_list:
-        logger.debug('[CVI-{cvi}] [新漏洞] 新规则 {macth} 已存在。'.format(cvi=svid, macth=vul_function))
+        logger.debug('[CVI-{cvi}] [NEW-VUL] New Rules {macth} exist.'.format(cvi=svid, macth=vul_function))
 
         if svid not in newcore_function_list[vul_function]["svid"]:
             newcore_function_list[vul_function]["svid"].append(svid)
@@ -1235,7 +1235,7 @@ def NewCore(old_single_rule, target_directory, new_rules, files, count=0, langua
             result = {}
     except Exception as e:
         traceback.print_exc()
-        logger.debug('匹配异常 ({e})'.format(e=e))
+        logger.debug('match exception ({e})'.format(e=e))
         return None
     try:
         result = result.decode('utf-8')
@@ -1257,11 +1257,11 @@ def NewCore(old_single_rule, target_directory, new_rules, files, count=0, langua
         logger.debug(
             '[CVI-{cvi}] [ORIGIN] {line}'.format(cvi=svid, line=": ".join(list(origin_vulnerability))))
         if origin_vulnerability == ():
-            logger.debug(' > 继续...')
+            logger.debug(' > continue...')
             continue
         vulnerability = auto_parse_match(origin_vulnerability, svid, language)
         if vulnerability is None:
-            logger.debug('非漏洞，继续...')
+            logger.debug('Not vulnerability, continue...')
             continue
 
         try:
@@ -1283,13 +1283,13 @@ def NewCore(old_single_rule, target_directory, new_rules, files, count=0, langua
                 is_vulnerability, reason = False, "Unpack error"
 
             if is_vulnerability:
-                logger.debug('[CVI-{cvi}] [RET] 发现 {code}'.format(cvi="00000", code=reason))
+                logger.debug('[CVI-{cvi}] [RET] Found {code}'.format(cvi="00000", code=reason))
                 vulnerability.analysis = reason
                 vulnerability.chain = data
                 rule_vulnerabilities.append(vulnerability)
             else:
                 if reason == 'New Core':  # 新的规则
-                    logger.debug('[CVI-{cvi}] [新漏洞] 新规则初始化'.format(cvi=sr.svid))
+                    logger.debug('[CVI-{cvi}] [NEW-VUL] New Rules init'.format(cvi=sr.svid))
                     new_rule_vulnerabilities = NewCore(sr, target_directory, data, files, count,
                                                        tamper_name=tamper_name, is_unconfirm=is_unconfirm,
                                                        newcore_function_list=newcore_function_list)
@@ -1301,7 +1301,7 @@ def NewCore(old_single_rule, target_directory, new_rules, files, count=0, langua
                         rule_vulnerabilities.extend(new_rule_vulnerabilities)
 
                 else:
-                    logger.debug('非漏洞: {code}'.format(code=reason))
+                    logger.debug('Not vulnerability: {code}'.format(code=reason))
 
         except Exception:
             raise

@@ -424,7 +424,7 @@ def is_repair(expr):
     global is_repair_functions
 
     if expr in is_repair_functions:
-        logger.debug("[AST] 函数 {} 在修复函数列表中，漏洞不存在 ".format(expr))
+        logger.debug("[AST] function {} in is_repair_functions, The vulnerability does not exist ".format(expr))
         is_re = True
     return is_re
 
@@ -572,7 +572,7 @@ def function_back(param, nodes, function_params, vul_function=None, file_path=No
 
     global scan_function_stack
     if function_name in scan_function_stack:
-        logger.info("[AST] 检测到递归函数追踪: {}，跳过以避免无限循环。".format(
+        logger.info("[AST] Recursive function trace detected: {}, skip to avoid endless loop.".format(
             " -> ".join(scan_function_stack + [function_name])))
         return -1, cp, expr_lineno
 
@@ -711,7 +711,7 @@ def class_back(param, node, lineno, vul_function=None, file_path=None, isback=No
     class_name = node.name
     class_nodes = node.nodes
 
-    logger.debug("[AST] 参数 {} 在类 {} 中，进入类分析...".format(param, class_name))
+    logger.debug("[AST] param {} in class {}, start into class...".format(param, class_name))
 
     vul_nodes = []
     for class_node in class_nodes:

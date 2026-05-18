@@ -29,7 +29,7 @@ class Dependencies(object):
     def dependencies(self):
         file_path, flag = self.find_file()
         if flag == 0:  # flag == 0
-            logger.debug('[依赖检查] 未找到依赖文件，无法进行依赖分析')
+            logger.debug('Dependency analysis cannot be done without finding dependency files')
             return False
         if flag == 1:
             self.find_python_pip(file_path)
@@ -78,7 +78,7 @@ class Dependencies(object):
     def find_python_pip(self, file_path):
         for requirement in file_path:
             if not os.path.isfile(requirement):
-                logger.warning("[依赖检查] 未找到 requirement 文件: {}".format(requirement))
+                logger.warning("[DEPENDENCIES] requirement file not found: {}".format(requirement))
                 continue
 
             with open(requirement) as fi:
@@ -108,7 +108,7 @@ class Dependencies(object):
         pom_ns = "{http://maven.apache.org/POM/4.0.0}"
         for pom in file_path:
             if not os.path.isfile(pom):
-                logger.warning("[依赖检查] 未找到 pom 文件: {}".format(pom))
+                logger.warning("[DEPENDENCIES] pom file not found: {}".format(pom))
                 continue
 
             tree = self.parse_xml(pom)

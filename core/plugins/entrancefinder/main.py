@@ -82,12 +82,12 @@ class EntranceFinder(BasePluginClass):
         else:
             filename = targetlist[-1]
 
-        logger.info('[入口发现] 目标 {} 开始扫描。'.format(filename))
-        logger.info('[入口发现] 设置扫描节点数量限制为 {}'.format(self.limit))
+        logger.info('[EntranceFinder] Target {} start scan.'.format(filename))
+        logger.info('[EntranceFinder] Set Scan limit node number is {}'.format(self.limit))
 
         if self.blackwords:
             self.black_list_split()
-            logger.info('[入口发现] 设置扫描黑名单为 {}'.format(self.black_list))
+            logger.info('[EntranceFinder] Set Scan Blacklist is {}'.format(self.black_list))
 
         # 加载目录文件
         pa = ParseArgs(self.target, '', 'csv', '', 'php', '', a_sid=None)
@@ -118,7 +118,7 @@ class EntranceFinder(BasePluginClass):
                     is_black = False
                     for bword in self.black_list:
                         if bword in now_content:
-                            logger.debug('[入口发现] 在文件 {} 中发现 {}'.format(filename, bword))
+                            logger.debug('[EntranceFinder] found {} in File {}'.format(bword, filename))
                             is_black = True
 
                     if is_black:
@@ -174,22 +174,22 @@ class EntranceFinder(BasePluginClass):
         oneline_nodes.sort(key=get_count, reverse=True)
 
         # print
-        logger.info("[入口发现] 目标超过 {} 个节点:\n-----------------------------------------------------".format(self.limit))
+        logger.info("[EntranceFinder] Target has more than {}:\n-----------------------------------------------------".format(self.limit))
 
         for data in more_than_twoline_nodes:
-            logger.info("[入口发现] {} 有 {} 个节点".format(data[0], data[1]))
+            logger.info("[EntranceFinder] {} has {} nodes".format(data[0], data[1]))
 
             if data[0] in similar_nodes:
                 if len(similar_nodes) > 1:
                     similar_nodes[data[0]].pop(0)
 
                     for snode in similar_nodes[data[0]]:
-                        logger.info("[入口发现] - 相似文件 {} 有 {} 个节点".format(snode[0], snode[1]))
+                        logger.info("[EntranceFinder] - Similar File {} has {} nodes".format(snode[0], snode[1]))
 
-        logger.info("[入口发现] 目标少于 {} 个节点:\n------------------------------------------------------".format(self.limit))
+        logger.info("[EntranceFinder] Target has < {} node:\n------------------------------------------------------".format(self.limit))
 
         for data in oneline_nodes:
-            logger.info("[入口发现] {} 有 {} 个节点".format(data[0], data[1]))
+            logger.info("[EntranceFinder] {} has {} nodes".format(data[0], data[1]))
 
             if data[0] in similar_nodes:
                 if len(similar_nodes) > 1:
@@ -197,7 +197,7 @@ class EntranceFinder(BasePluginClass):
 
                     for snode in similar_nodes[data[0]]:
 
-                        logger.info("[入口发现] - 相似文件 {} 有 {} 个节点".format(snode[0], snode[1]))
+                        logger.info("[EntranceFinder] - Similar File {} has {} nodes".format(snode[0], snode[1]))
 
     def count_line(self, nodes):
         """

@@ -54,11 +54,11 @@ def check_scantask(task_name, target_path, parameter_config, project_origin, pro
     s = ScanTask.objects.filter(task_name=task_name, target_path=target_path, parameter_config=parameter_config, is_finished=1).order_by("-id").first()
 
     if s and not auto_yes:
-        logger.warning("[INIT] {} 的扫描任务已执行。".format(task_name))
-        logger.warning("[INIT] 是否重新扫描任务 {}?(Y/N) (默认 N)".format(task_name))
+        logger.warning("[INIT] ScanTask for {} has been executed.".format(task_name))
+        logger.warning("[INIT] whether rescan Task {}?(Y/N) (Default N)".format(task_name))
 
         if input().lower() != 'y':
-            logger.warning("[INIT] 是否显示上次扫描结果?(Y/N) (默认 Y)")
+            logger.warning("[INIT] whether Show Last Scan Result?(Y/N) (Default Y)")
 
             if input().lower() != 'n':
                 display_result(s.id, is_ask=True)
@@ -88,7 +88,7 @@ def display_result(scan_id, is_ask=False):
 
     # check unconfirm
     if is_ask:
-        logger.warning("[INIT] 是否显示未确认结果?(Y/N) (默认 Y)")
+        logger.warning("[INIT] whether Show Unconfirm Result?(Y/N) (Default Y)")
 
     project_id = get_and_check_scantask_project_id(scan_id)
 
@@ -101,10 +101,10 @@ def display_result(scan_id, is_ask=False):
     else:
         srs = get_and_check_scanresult(scan_id).objects.filter(scan_project_id=project_id, is_active=True,
                                                                is_unconfirm=False)
-    logger.info("[INIT] 项目 ID 为 {}".format(project_id))
+    logger.info("[INIT] Project ID is {}".format(project_id))
 
     if srs:
-        logger.info("[MainThread] 扫描 id {} 结果: ".format(scan_id))
+        logger.info("[MainThread] Scan id {} Result: ".format(scan_id))
 
         for sr in srs:
 
@@ -134,7 +134,7 @@ def display_result(scan_id, is_ask=False):
                     rule_name = "Unknown Rule"
                     author = "Unknown"
                     level = VUL_LEVEL[1]
-                    logger.warning("[SCAN] 规则 CVI_{} 在数据库中未找到，回退显示。".format(sr.cvi_id))
+                    logger.warning("[SCAN] Rule CVI_{} not found in database, fallback display.".format(sr.cvi_id))
 
             row = [sr.id, sr.cvi_id, rule_name, sr.language, level, sr.vulfile_path,
                    author, sr.source_code, sr.result_type]
@@ -145,9 +145,9 @@ def display_result(scan_id, is_ask=False):
             ResultFlow = get_resultflow_class(scan_id)
             rfs = ResultFlow.objects.filter(vul_id=sr.id)
 
-            logger.info("[链路] 漏洞 {}".format(sr.id))
+            logger.info("[Chain] Vul {}".format(sr.id))
             for rf in rfs:
-                logger.info("[链路] {}, {}, {}:{}".format(rf.node_type, rf.node_content, rf.node_path, rf.node_lineno))
+                logger.info("[Chain] {}, {}, {}:{}".format(rf.node_type, rf.node_content, rf.node_path, rf.node_lineno))
 
                 try:
                     if author == 'SCA':
@@ -156,13 +156,13 @@ def display_result(scan_id, is_ask=False):
                     if not show_context(rf.node_path, rf.node_lineno):
                         logger_console.info(rf.node_source)
                 except:
-                    logger.error("[SCAN] 错误: {}".format(traceback.print_exc()))
+                    logger.error("[SCAN] Error: {}".format(traceback.print_exc()))
                     continue
 
             logger.info(
-                "[SCAN] 结束\r\n -------------------------------------------------------------------------")
+                "[SCAN] ending\r\n -------------------------------------------------------------------------")
 
-        logger.info("[SCAN] 触发漏洞 ({vn})\r\n{table}".format(vn=len(srs), table=table))
+        logger.info("[SCAN] Trigger Vulnerabilities ({vn})\r\n{table}".format(vn=len(srs), table=table))
 
         # show New evil Function
         nfs = NewEvilFunc.objects.filter(project_id=project_id, is_active=1)
@@ -181,10 +181,10 @@ def display_result(scan_id, is_ask=False):
                 table2.add_row(row)
                 idy += 1
 
-            logger.info("[MainThread] 新危险函数列表:\r\n{table}".format(table=table2))
+            logger.info("[MainThread] New evil Function list by NewCore:\r\n{table}".format(table=table2))
 
     else:
-        logger.info("[MainThread] 扫描 id {} 无结果。".format(scan_id))
+        logger.info("[MainThread] Scan id {} has no Result.".format(scan_id))
 
 
 def start(target, formatter, output, special_rules, a_sid=None, language=None, tamper_name=None, black_path=None, is_unconfirm=False, is_unprecom=False):
@@ -247,7 +247,7 @@ def start(target, formatter, output, special_rules, a_sid=None, language=None, t
             main_language = pa.language
             main_framework = pa.language
 
-        logger.info('[CLI] [统计] 语言: {l} 框架: {f}'.format(l=",".join(main_language), f=main_framework))
+        logger.info('[CLI] [STATISTIC] Language: {l} Framework: {f}'.format(l=",".join(main_language), f=main_framework))
         logger.info('[CLI] [STATISTIC] Files: {fc}, Extensions:{ec}, Consume: {tc}'.format(fc=file_count,
                                                                                            ec=len(files),
                                                                                            tc=time_consume))
@@ -268,7 +268,7 @@ def start(target, formatter, output, special_rules, a_sid=None, language=None, t
         display_result(task_id)
 
     except KeyboardInterrupt as e:
-        logger.error("[!] 键盘中断，退出...")
+        logger.error("[!] KeyboardInterrupt, exit...")
         exit()
     except Exception:
         result = {
@@ -341,10 +341,10 @@ def show_info(type, key):
                     f = codecs.open(os.path.join(RULES_PATH, lan, "CVI_{}.py".format(key)), encoding='utf-8', errors="ignore")
                     return f.read()
 
-            logger.error('[展示] 无 CVI id {}。'.format(key))
+            logger.error('[Show] no CVI id {}.'.format(key))
             return ""
         else:
-            logger.error('[展示] 错误的语言/CVI id 输入。')
+            logger.error('[Show] error language/CVI id input.')
             return ""
 
         i = 0
@@ -413,7 +413,7 @@ Input Control:
 {}
 """.format(tampname, pprint.pformat(filter_func, indent=4), pprint.pformat(input_control, indent=4))
         else:
-            logger.error("[信息] 无篡改名称 {}".format(key))
+            logger.error("[Info] no tamper name {]".format(key))
 
     return ""
 
@@ -442,7 +442,7 @@ def search_project(search_type, keyword, keyword_value, with_vuls=False):
         j = 0
 
         if not ps:
-            logger.info("搜索结果为空。")
+            logger.info("Search result is empty.")
             return False
 
         for p in ps:
@@ -466,13 +466,13 @@ def search_project(search_type, keyword, keyword_value, with_vuls=False):
 
                         table2.add_row([i, vv.vuln_id, vv.title, VENDOR_VUL_LEVEL[vv.severity], vv.cves, vv.reference, vv.vendor_name, vv.affected_versions])
 
-        logger.info("项目列表 (小于 {} {}):\n{}".format(keyword, keyword_value, table))
+        logger.info("Project List (Small than {} {}):\n{}".format(keyword, keyword_value, table))
 
         if with_vuls:
             if j == 0:
-                logger.info("组件 {}:{} 漏洞列表为空。".format(keyword, keyword_value))
+                logger.info("Vendor {}:{} Vul List is empty.".format(keyword, keyword_value))
             else:
-                logger.info("组件 {}:{} 漏洞列表:\n{}".format(keyword, keyword_value, table2))
+                logger.info("Vendor {}:{} Vul List:\n{}".format(keyword, keyword_value, table2))
 
     return True
 

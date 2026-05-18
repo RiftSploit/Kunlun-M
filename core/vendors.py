@@ -188,7 +188,7 @@ def get_and_save_vendor_vuls(task_id, vendor_name, vendor_version, language, ext
     if not vendor_version or vendor_version == "unknown":
         return []
 
-    logger.info("[Vendor Vuls] 抓取 {} 组件 {} 版本 {} 漏洞。".format(language, vendor_name, vendor_version))
+    logger.info("[Vendor Vuls] Spider {} Vendor {} Version {} Vul.".format(language, vendor_name, vendor_version))
 
     _vendor = {"name": vendor_name, "version": vendor_version}
     for vuln in get_vulns(language, _vendor["name"], _vendor["version"]):
@@ -245,7 +245,7 @@ class Vendors:
                         filename = file.split('/')[-1].split('\\')[-1]
 
                         if filename in self.vendor_file_list:
-                            logger.info("[Vendor] 组件文件 {} 在 {} 中被发现。".format(filename, file))
+                            logger.info("[Vendor] Vendor file {} be found in {}.".format(filename, file))
 
                             self.exist_file_list.append(file)
                             continue
@@ -292,7 +292,7 @@ class Vendors:
                 f.seek(0, os.SEEK_SET)
                 savefilepath = filepath.replace(self.target_path, "").replace('\\', '/')
 
-                logger.info("[Vendor] 解析文件 {}。".format(savefilepath))
+                logger.info("[Vendor] Parse File {}.".format(savefilepath))
 
                 if filename == "requirements.txt":
 
@@ -483,7 +483,7 @@ class Vendors:
                         vendor_version = version
                         ext = "mevan"
 
-                        logger.debug("[Vendor][pom.xml] 在文件 {} 中发现组件 {} 版本 {}".format(savefilepath, vendor_name, vendor_version))
+                        logger.debug("[Vendor][pom.xml] Found Vendor {} vension {} in file {}".format(vendor_name, vendor_version, savefilepath))
 
                         update_and_new_project_vendor(self.project_id, name=vendor_name, version=vendor_version,
                                                       language=language, source=savefilepath, ext=ext)
@@ -554,10 +554,10 @@ class Vendors:
                         pending_scan.append((language, dependency, vendor_version, ext))
 
                 else:
-                    logger.warn("[Vendor] 组件文件 {} 不支持".format(filename))
+                    logger.warn("[Vendor] Vendor file {} not support".format(filename))
 
             except:
-                logger.error("[Vendor] 组件文件 {} 检查出错。\n错误: {}".format(file, traceback.format_exc()))
+                logger.error("[Vendor] Error check for Vendor file {}.\nError: {}".format(file, traceback.format_exc()))
                 continue
 
         if settings.WITH_VENDOR:
