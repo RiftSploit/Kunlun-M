@@ -12,6 +12,8 @@
     :copyright: Copyright (c) 2017 LoRexxar. All rights reserved
 """
 import os
+import sys
+import importlib
 import inspect
 import codecs
 from Kunlun_M.settings import RULES_PATH
@@ -59,8 +61,9 @@ class Rule(object):
         else:
             lans = list(lans)
 
+        self.lans = list(lans)
         origin_lans = ["base"]
-        origin_lans.extend(lans)
+        origin_lans.extend(self.lans)
 
         self.rule_dict = {}
 
@@ -77,9 +80,70 @@ class Rule(object):
             for rule in self.rule_list:
                 rulename = rule.split('.')[0]
                 rulefile = "rules." + lan + "." + rulename
-                self.rule_dict[rulename] = __import__(rulefile, fromlist=rulename)
+
+                try:
+                    self.rule_dict[rulename] = __import__(rulefile, fromlist=rulename)
+                except Exception as e:
+                    logger.error("[INIT][RULE] Failed to load rule {}: {}".format(rulename, e))
 
         self.vulnerabilities = self.vul_init()
+
+    def reload(self):
+        """热加载规则文件，无需重启扫描进程。
+
+        对已导入的规则模块调用 importlib.reload() 获取最新代码，
+        同时扫描目录以支持新增或删除的规则文件。
+        如果某个规则文件存在语法错误，会记录日志并跳过，不影响其他规则的加载。
+
+        :return: 重新加载的规则数量
+        :rtype: int
+
+        用法::
+
+            r = Rule(["php"])
+            # ... 修改了规则文件 ...
+            count = r.reload()
+            print(f"已重新加载 {count} 条规则")
+        """
+        origin_lans = ["base"]
+        origin_lans.extend(self.lans)
+
+        old_rule_dict = self.rule_dict
+        self.rule_dict = {}
+        count = 0
+
+        for lan in origin_lans:
+            self.rules_path = RULES_PATH + "/" + lan
+            if not os.path.exists(self.rules_path):
+                logger.error("[RELOAD][RULE] language {} can't found rules".format(self.rules_path))
+                continue
+
+            self.rule_list = self.list_parse()
+
+            for rule in self.rule_list:
+                rulename = rule.split('.')[0]
+                rulefile = "rules." + lan + "." + rulename
+
+                try:
+                    # 对已导入的模块执行 reload，新模块直接 import
+                    if rulename in old_rule_dict:
+                        module = old_rule_dict[rulename]
+                        module = importlib.reload(module)
+                        self.rule_dict[rulename] = module
+                    else:
+                        self.rule_dict[rulename] = __import__(rulefile, fromlist=rulename)
+
+                    count += 1
+                except Exception as e:
+                    logger.error("[RELOAD][RULE] Failed to load rule {}: {}".format(rulename, e))
+                    # 如果 reload 失败，尝试保留旧版本
+                    if rulename in old_rule_dict:
+                        self.rule_dict[rulename] = old_rule_dict[rulename]
+                        logger.warning("[RELOAD][RULE] Keeping previous version of rule {}".format(rulename))
+
+        self.vulnerabilities = self.vul_init()
+        logger.info("[RELOAD][RULE] Reloaded {} rules, total {} rules loaded".format(count, len(self.rule_dict)))
+        return count
 
     def rules(self, special_rules=None):
 
