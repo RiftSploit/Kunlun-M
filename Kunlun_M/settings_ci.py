@@ -99,6 +99,8 @@ if os.path.isdir(RESULT_PATH) is not True:
     os.makedirs(RESULT_PATH, exist_ok=True)
 DEFAULT_RESULT_PATH = RESULT_PATH
 
+HTML_TEMPLATE_PATH = ''
+
 KUNLUN_MAIN = os.path.join(PROJECT_DIRECTORY, 'kunlun.py')
 CORE_PATH = os.path.join(PROJECT_DIRECTORY, 'core')
 TESTS_PATH = os.path.join(PROJECT_DIRECTORY, 'tests')
