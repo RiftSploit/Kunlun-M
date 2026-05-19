@@ -16,6 +16,7 @@ import traceback
 
 from core.core_engine.php.parser import scan_parser as php_scan_parser
 from core.core_engine.javascript.parser import scan_parser as js_scan_parser
+from core.core_engine.java.parser import scan_parser as java_scan_parser
 
 from .cast import CAST
 from .filters import VulnerabilityFilter
@@ -171,6 +172,7 @@ class VulnerabilityMatcher(object):
             'solidity': self._scan_solidity,
             'javascript': self._scan_javascript,
             'chromeext': self._scan_chromeext,
+            'java': self._scan_java,
         }
         handler = dispatch.get(self.lan, self._scan_generic)
         return handler()
@@ -378,6 +380,31 @@ class VulnerabilityMatcher(object):
                 return True, 'Specail-crx-keyword-match'
             else:
                 logger.warn("[CVI-{cvi} [OTHER-MATCH]] chrome ext rules not support it...".format(cvi=self.cvi))
+                return False, 'Unsupport Match'
+
+        except Exception as e:
+            logger.debug(traceback.format_exc())
+            return False, 'Exception'
+
+    def _scan_java(self):
+        """Java 扫描（Phase 1：仅支持 only-regex 和 regex-return-regex）"""
+        try:
+            ast = CAST(self.rule_match, self.target_directory, self.file_path, self.line_number,
+                       self.code_content, files=self.files, rule_class=self.single_rule,
+                       repair_functions=self.repair_functions)
+
+            if self.rule_match_mode == const.mm_regex_only_match:
+                logger.debug("[CVI-{cvi}] [ONLY-MATCH]".format(cvi=self.cvi))
+                return True, 'Regex-only-match'
+
+            elif self.rule_match_mode == const.mm_regex_return_regex:
+                logger.debug("[CVI-{cvi}] [REGEX-RETURN-REGEX]".format(cvi=self.cvi))
+                return True, 'Regex-return-regex'
+
+            else:
+                logger.warn(
+                    "[CVI-{cvi}] Java currently only supports only-regex and regex-return-regex".format(
+                        cvi=self.cvi))
                 return False, 'Unsupport Match'
 
         except Exception as e:

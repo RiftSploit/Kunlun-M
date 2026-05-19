@@ -14,6 +14,7 @@ from bs4 import BeautifulSoup
 
 import esprima
 import jsbeautifier
+import javalang
 
 from utils.log import logger
 from Kunlun_M.const import ext_dict
@@ -30,7 +31,7 @@ import queue
 import asyncio
 from collections.abc import Hashable
 
-could_ast_pase_lans = ["php", "chromeext", "javascript", "html"]
+could_ast_pase_lans = ["php", "chromeext", "javascript", "html", "java"]
 
 
 class Pretreatment:
@@ -488,6 +489,33 @@ class Pretreatment:
 
                     except:
                         logger.warning('[AST] something error, {}'.format(traceback.format_exc()))
+                        continue
+
+            elif fileext[0] in ext_dict['java'] and 'java' in self.lan:
+                # 针对 Java 的预处理
+                for filepath in fileext[1]['list']:
+                    filepath = self.get_path(filepath)
+                    self.pre_result[filepath] = {}
+                    self.pre_result[filepath]['language'] = 'java'
+                    self.pre_result[filepath]['ast_nodes'] = []
+
+                    try:
+                        fi = codecs.open(filepath, "r", encoding="utf-8", errors="ignore")
+                        code_content = fi.read()
+                        fi.close()
+
+                        if not self.is_unprecom:
+                            tree = javalang.parse.parse(code_content)
+                            self.pre_result[filepath]['ast_nodes'] = tree
+                        else:
+                            self.pre_result[filepath]['ast_nodes'] = []
+
+                    except javalang.parser.JavaSyntaxError:
+                        logger.warning("[AST] [ERROR] parser {} JavaSyntaxError".format(filepath))
+                        continue
+
+                    except:
+                        logger.warning("[AST] something error, {}".format(traceback.format_exc()))
                         continue
 
             # 手动回收?
