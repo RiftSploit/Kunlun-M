@@ -3,12 +3,12 @@
 import traceback
 import javalang
 from utils.log import logger
+from core.pretreatment import ast_object as _ast_object_singleton
 
 scan_results = []
 is_repair_functions = []
 is_controlled_params = []
 scan_chain = []
-ast_object = None
 
 
 def _collect_member_references(expr, refs=None):
@@ -91,16 +91,54 @@ def _collect_controllable_vars(method_node, request_var_names):
     for rvn in request_var_names:
         controllable.add(rvn)
 
-    # 方法参数（简单处理：所有 String 类型参数视为潜在可控）
+    # 方法参数识别 —— 基于类型和注解
+    SPRING_PARAM_ANNOTATIONS = {
+        'RequestParam', 'PathVariable', 'RequestBody',
+        'RequestHeader', 'CookieValue', 'ModelAttribute',
+    }
+
+    JAXRS_PARAM_ANNOTATIONS = {
+        'PathParam', 'QueryParam', 'FormParam',
+        'HeaderParam', 'BeanParam',
+    }
+
+    ALL_PARAM_ANNOTATIONS = SPRING_PARAM_ANNOTATIONS | JAXRS_PARAM_ANNOTATIONS
+
     if method_node.parameters:
         for param in method_node.parameters:
             param_type = ""
             if hasattr(param, 'type') and param.type:
                 param_type = param.type.name if hasattr(param.type, 'name') else str(param.type)
-            # HttpServletRequest / String 参数
-            if 'Request' in param_type or 'String' in param_type:
+
+            # 1. HttpServletRequest 等含 Request 的类型 → 可控（Servlet API）
+            if 'Request' in param_type:
                 controllable.add(param.name)
-                logger.debug("[AST][Java] Controllable method param: {}".format(param.name))
+                logger.debug("[AST][Java] Controllable method param (Request type): {}".format(param.name))
+                continue
+
+            # 2. MultipartFile / InputStream 类型 → 可控（文件上传/输入流）
+            if 'MultipartFile' in param_type or 'InputStream' in param_type:
+                controllable.add(param.name)
+                logger.debug("[AST][Java] Controllable method param (File/Stream type): {}".format(param.name))
+                continue
+
+            # 3. Principal 类型 → 可控（认证主体可能被伪造）
+            if 'Principal' in param_type:
+                controllable.add(param.name)
+                continue
+
+            # 4. 检查参数注解（Spring / JAX-RS）
+            if hasattr(param, 'annotations') and param.annotations:
+                for ann in param.annotations:
+                    ann_name = ann.name if hasattr(ann, 'name') else str(ann)
+                    # 处理全限定名如 org.springframework.web.bind.annotation.RequestParam
+                    if '.' in ann_name:
+                        ann_name = ann_name.split('.')[-1]
+                    if ann_name in ALL_PARAM_ANNOTATIONS:
+                        controllable.add(param.name)
+                        logger.debug("[AST][Java] Controllable method param (annotation @{}): {}".format(
+                            ann_name, param.name))
+                        break
 
     if not method_node.body:
         return controllable
@@ -122,6 +160,14 @@ def _collect_controllable_vars(method_node, request_var_names):
                             logger.debug("[AST][Java] Controllable var: {} from {}.{}()".format(
                                 declarator.name, init.qualifier, init.member))
 
+                        # Spring 常见获取输入的方式
+                        # 如: params.get("key"), map.get("key") 当 params/map 是 @RequestParam Map 时
+                        # 如: body.get("key") 当 body 是 Map 类型来自 @RequestBody 时
+                        if init.member == 'get' and init.qualifier in controllable:
+                            controllable.add(declarator.name)
+                            logger.debug("[AST][Java] Controllable var: {} from {}.get()".format(
+                                declarator.name, init.qualifier))
+
     return controllable
 
 
@@ -135,6 +181,28 @@ def _find_request_var_names(method_node):
                 if 'Request' in type_name or 'HttpServletRequest' in type_name:
                     request_vars.add(param.name)
     return request_vars
+
+
+def _find_annotated_param_names(method_node):
+    """从方法参数注解中找到被 Spring/JAX-RS 注解标记的参数名"""
+    SPRING_ANN = {'RequestParam', 'PathVariable', 'RequestBody',
+                  'RequestHeader', 'CookieValue', 'ModelAttribute'}
+    JAXRS_ANN = {'PathParam', 'QueryParam', 'FormParam',
+                 'HeaderParam', 'BeanParam'}
+    ALL_ANN = SPRING_ANN | JAXRS_ANN
+
+    annotated_params = set()
+    if method_node.parameters:
+        for param in method_node.parameters:
+            if hasattr(param, 'annotations') and param.annotations:
+                for ann in param.annotations:
+                    ann_name = ann.name if hasattr(ann, 'name') else str(ann)
+                    if '.' in ann_name:
+                        ann_name = ann_name.split('.')[-1]
+                    if ann_name in ALL_ANN:
+                        annotated_params.add(param.name)
+                        break
+    return annotated_params
 
 
 def _has_repair_function(expr, repair_functions):
@@ -276,7 +344,7 @@ def scan_parser(sensitive_func, vul_lineno, file_path, repair_functions=[], cont
     :param controlled_params: 可控参数列表
     :return: scan_results 列表，每个元素是 {"code": N, "chain": [...], ...}
     """
-    global scan_results, is_repair_functions, is_controlled_params, scan_chain, ast_object
+    global scan_results, is_repair_functions, is_controlled_params, scan_chain
 
     try:
         scan_chain = ["start"]
@@ -284,11 +352,11 @@ def scan_parser(sensitive_func, vul_lineno, file_path, repair_functions=[], cont
         is_repair_functions = repair_functions
         is_controlled_params = controlled_params
 
-        if ast_object is None:
+        if _ast_object_singleton is None:
             logger.debug("[AST][Java] ast_object is None, skip")
             return scan_results
 
-        _nodes = ast_object.get_nodes(file_path)
+        _nodes = _ast_object_singleton.get_nodes(file_path)
 
         if not _nodes:
             logger.debug("[AST][Java] No AST nodes for {}".format(file_path))

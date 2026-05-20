@@ -109,6 +109,13 @@ class VulnerabilityMatcher(object):
             b = __import__('rules.tamper.demo', fromlist=['PHP_IS_CONTROLLED_DEFAULT'])
             self.controlled_list = getattr(b, 'PHP_IS_CONTROLLED_DEFAULT')
 
+        elif self.lan == "java":
+            a = __import__('rules.tamper.demo_java', fromlist=['JAVA_IS_REPAIR_DEFAULT'])
+            self.repair_dict = getattr(a, 'JAVA_IS_REPAIR_DEFAULT')
+
+            b = __import__('rules.tamper.demo_java', fromlist=['JAVA_IS_CONTROLLED_DEFAULT'])
+            self.controlled_list = getattr(b, 'JAVA_IS_CONTROLLED_DEFAULT')
+
         # 如果指定加载某个tamper，那么无视语言
         if self.tamper_name is not None:
             try:
