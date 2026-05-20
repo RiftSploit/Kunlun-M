@@ -6,6 +6,7 @@
     :author:    KunLun-M
     :homepage:  https://github.com/LoRexxar/Kunlun-M
     :license:   MIT, see LICENSE for more details.
+    :copyright: Copyright (c) 2017 LoRexxar. All rights reserved
 """
 from utils.api import *
 
@@ -20,8 +21,14 @@ class CVI_6040():
         self.level = 9
         self.status = True
         self.match_mode = "only-regex"
-        self.match = [r'enableDefaultTyping\(\)']
-        self.unmatch = [r'PolymorphicTypeValidator', r'activateDefaultTyping']
+        self.match = [
+            r'enableDefaultTyping\s*\(',
+        ]
+        self.unmatch = [
+            r'PolymorphicTypeValidator',
+            r'activateDefaultTyping',
+            r'DefaultTyping\.NON_CONCRETE_AND_ARRAYS',
+        ]
         self.black_list = []
         self.keyword = None
         self.vul_function = None

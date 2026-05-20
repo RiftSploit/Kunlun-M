@@ -6,6 +6,7 @@
     :author:    KunLun-M
     :homepage:  https://github.com/LoRexxar/Kunlun-M
     :license:   MIT, see LICENSE for more details.
+    :copyright: Copyright (c) 2017 LoRexxar. All rights reserved
 """
 from utils.api import *
 
@@ -20,8 +21,14 @@ class CVI_6039():
         self.level = 8
         self.status = True
         self.match_mode = "only-regex"
-        self.match = [r'\$\{[^}]+\}']
-        self.unmatch = []
+        self.match = [
+            r'\$\{[a-zA-Z_]\w*(?:\.\w+)*\}',
+        ]
+        self.unmatch = [
+            r'#\{[^}]*\$\{',
+            r'\$\{[a-z]+\.[a-z]+\.[a-z]+',  # Spring-style property paths
+            r'jndi:',
+        ]
         self.black_list = []
         self.keyword = None
         self.vul_function = None

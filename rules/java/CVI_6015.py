@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 """
-    Java Open Redirect Rule
+    Java Open Redirect Rule (AST-enhanced)
     ~~~~
     :author:    KunLun-M
     :homepage:  https://github.com/LoRexxar/Kunlun-M
@@ -29,8 +29,8 @@ class CVI_6015():
         self.status = True
 
         # 部分配置
-        self.match_mode = "only-regex"
-        self.match = [r"sendRedirect\(.*?getParameter"]
+        self.match_mode = "function-param-regex"
+        self.match = "sendRedirect"
 
         # for solidity
         self.match_name = None
@@ -42,7 +42,7 @@ class CVI_6015():
         # for regex
         self.unmatch = [r"validateRedirect", r"isValidRedirect", r"allowedDomains"]
 
-        self.vul_function = None
+        self.vul_function = ["sendRedirect"]
 
     def main(self, regex_string):
         pass

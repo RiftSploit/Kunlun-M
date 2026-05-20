@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 """
-    Java Insecure Deserialization Rule
+    Java Insecure Deserialization Rule (AST-enhanced)
     ~~~~
     :author:    KunLun-M
     :homepage:  https://github.com/LoRexxar/Kunlun-M
@@ -22,15 +22,19 @@ class CVI_6005():
         self.language = "java"
         self.author = "KunLun-M"
         self.vulnerability = "Insecure Deserialization"
-        self.description = "使用了ObjectInputStream、readObject()、XMLDecoder等不安全的反序列化方式，可能导致远程代码执行漏洞。建议使用ObjectInputFilter或ValidatingObjectInputStream进行过滤。"
+        self.description = "通过AST分析检测ObjectInputStream.readObject()、XMLDecoder等反序列化方法的输入源是否来自用户可控数据，追踪数据流以发现反序列化漏洞。建议使用ObjectInputFilter或ValidatingObjectInputStream进行过滤。"
         self.level = 9
 
         # status
         self.status = True
 
         # 部分配置
-        self.match_mode = "only-regex"
-        self.match = [r"readObject\(\)"]
+        self.match_mode = "function-param-regex"
+        self.match = [
+            r"\.readObject\s*\(\s*\)",
+            r"new\s+ObjectInputStream\s*\(",
+            r"new\s+XMLDecoder\s*\(",
+        ]
 
         # for solidity
         self.match_name = None
@@ -40,9 +44,13 @@ class CVI_6005():
         self.keyword = None
 
         # for regex
-        self.unmatch = [r"ObjectInputFilter", r"ValidatingObjectInputStream", r"SafeObjectInputStream"]
+        self.unmatch = [
+            r"ObjectInputFilter",
+            r"ValidatingObjectInputStream",
+            r"SafeObjectInputStream",
+        ]
 
-        self.vul_function = None
+        self.vul_function = ["readObject", "ObjectInputStream"]
 
     def main(self, regex_string):
         pass

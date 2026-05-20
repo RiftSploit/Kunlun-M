@@ -30,7 +30,10 @@ class CVI_6014():
 
         # 部分配置
         self.match_mode = "only-regex"
-        self.match = [r"setSecure\(false\)"]
+        self.match = [
+            r'\.setSecure\s*\(\s*false\s*\)',
+            r'\.setHttpOnly\s*\(\s*false\s*\)',
+        ]
 
         # for solidity
         self.match_name = None
@@ -40,7 +43,7 @@ class CVI_6014():
         self.keyword = None
 
         # for regex
-        self.unmatch = [r"setSecure\(true\)", r"setHttpOnly\(true\)"]
+        self.unmatch = [r"setSecure\s*\(\s*true", r"setHttpOnly\s*\(\s*true"]
 
         self.vul_function = None
 

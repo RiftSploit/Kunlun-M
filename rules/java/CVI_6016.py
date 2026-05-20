@@ -30,7 +30,11 @@ class CVI_6016():
 
         # 部分配置
         self.match_mode = "only-regex"
-        self.match = [r"(?:java\.util\.Random|new\s+Random\(\))"]
+        self.match = [
+            r'java\.util\.Random\b',
+            r'new\s+Random\s*\(\s*\)',
+            r'Math\.random\s*\(\s*\)',
+        ]
 
         # for solidity
         self.match_name = None

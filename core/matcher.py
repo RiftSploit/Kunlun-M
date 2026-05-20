@@ -409,7 +409,13 @@ class VulnerabilityMatcher(object):
                 return True, 'Regex-return-regex'
 
             elif self.rule_match_mode == const.mm_function_param_controllable:
-                rule_match = self.rule_match.strip('()').split('|')
+                # 优先使用 vul_function 列表做 AST 分析
+                if (hasattr(self.single_rule, 'vul_function') and
+                    isinstance(self.single_rule.vul_function, list) and
+                    len(self.single_rule.vul_function) > 0):
+                    rule_match = self.single_rule.vul_function
+                else:
+                    rule_match = self.rule_match.strip('()').split('|')
                 logger.debug('[RULE_MATCH] {r}'.format(r=rule_match))
                 try:
                     result = java_scan_parser(rule_match, self.line_number, self.file_path,

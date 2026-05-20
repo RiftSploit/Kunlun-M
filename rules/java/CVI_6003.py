@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 """
-    Java Command Injection Rule
+    Java Command Injection Rule (AST-enhanced)
     ~~~~
     :author:    KunLun-M
     :homepage:  https://github.com/LoRexxar/Kunlun-M
@@ -22,15 +22,18 @@ class CVI_6003():
         self.language = "java"
         self.author = "KunLun-M"
         self.vulnerability = "Command Injection"
-        self.description = "使用了Runtime.getRuntime().exec()或ProcessBuilder执行系统命令，如果命令参数可控，可能导致命令注入漏洞。"
+        self.description = "通过AST分析检测Runtime.getRuntime().exec()或ProcessBuilder构造参数是否来自用户可控输入，追踪数据流以发现命令注入漏洞。"
         self.level = 9
 
         # status
         self.status = True
 
         # 部分配置
-        self.match_mode = "only-regex"
-        self.match = [r"Runtime\.getRuntime\(\)\.exec"]
+        self.match_mode = "function-param-regex"
+        self.match = [
+            r"Runtime\.getRuntime\s*\(\s*\)\s*\.exec\s*\(",
+            r"new\s+ProcessBuilder\s*\(",
+        ]
 
         # for solidity
         self.match_name = None
@@ -42,7 +45,7 @@ class CVI_6003():
         # for regex
         self.unmatch = []
 
-        self.vul_function = None
+        self.vul_function = ["exec", "ProcessBuilder"]
 
     def main(self, regex_string):
         pass

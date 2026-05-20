@@ -30,7 +30,10 @@ class CVI_6017():
 
         # 部分配置
         self.match_mode = "only-regex"
-        self.match = [r"\$\{jndi:"]
+        self.match = [
+            r'\$\{[^}]*jndi\s*:',
+            r'JndiLookup',
+        ]
 
         # for solidity
         self.match_name = None
@@ -40,7 +43,7 @@ class CVI_6017():
         self.keyword = None
 
         # for regex
-        self.unmatch = [r"log4j2\.formatMsgNoLookups", r"NO_LOOKUPS"]
+        self.unmatch = [r"log4j2\.formatMsgNoLookups", r"NO_LOOKUPS", r"JndiManager"]
 
         self.vul_function = None
 

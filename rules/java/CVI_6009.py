@@ -30,7 +30,10 @@ class CVI_6009():
 
         # 部分配置
         self.match_mode = "only-regex"
-        self.match = [r"(?:password|PASSWORD|secret|apiKey|api_key)\s*=\s*\"[^\"]{4,}\""]
+        self.match = [
+            r'(?:password|passwd|PASSWORD|secret|SECRET|apiKey|api_key|API_KEY|accessKey|access_key|secretKey|secret_key|private[_\-]?[Kk]ey|token|AUTH_TOKEN|credential)\s*=\s*"[^"]{4,}"',
+            r'(?:password|passwd|PASSWORD|secret|SECRET|apiKey|api_key|API_KEY|accessKey|access_key|secretKey|secret_key|private[_\-]?[Kk]ey|token|AUTH_TOKEN|credential)\s*=\s*new\s+String\s*\(\s*"[^"]{4,}"\s*\)',
+        ]
 
         # for solidity
         self.match_name = None
@@ -40,7 +43,16 @@ class CVI_6009():
         self.keyword = None
 
         # for regex
-        self.unmatch = [r"System\.getenv", r"@Value\(", r"properties\.getProperty", r"config\.get"]
+        self.unmatch = [
+            r"System\.getenv",
+            r"@Value\s*\(",
+            r"properties\.getProperty",
+            r"config\.get",
+            r"getenv\s*\(",
+            r"Optional\.of",
+            r"Strings\.isEmpty",
+            r"\.equals\s*\(",
+        ]
 
         self.vul_function = None
 

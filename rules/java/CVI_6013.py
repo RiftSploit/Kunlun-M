@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 """
-    Java LDAP Injection Rule
+    Java LDAP Injection Rule (AST-enhanced)
     ~~~~
     :author:    KunLun-M
     :homepage:  https://github.com/LoRexxar/Kunlun-M
@@ -29,8 +29,8 @@ class CVI_6013():
         self.status = True
 
         # 部分配置
-        self.match_mode = "only-regex"
-        self.match = [r"DirContext\.search"]
+        self.match_mode = "function-param-regex"
+        self.match = "search"
 
         # for solidity
         self.match_name = None
@@ -42,7 +42,7 @@ class CVI_6013():
         # for regex
         self.unmatch = [r"escapeLDAP", r"encodeLDAP", r"LdapEncoder"]
 
-        self.vul_function = None
+        self.vul_function = ["search"]
 
     def main(self, regex_string):
         pass

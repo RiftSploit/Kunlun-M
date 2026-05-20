@@ -30,7 +30,11 @@ class CVI_6019():
 
         # 部分配置
         self.match_mode = "only-regex"
-        self.match = [r"Access-Control-Allow-Origin.*?\*"]
+        self.match = [
+            r'(?:setHeader|addHeader)\s*\(\s*"Access-Control-Allow-Origin"\s*,\s*"\*"\s*\)',
+            r'@CrossOrigin\s*\(\s*(?:origins|value)\s*=\s*"\*"',
+            r'\.allowedOrigins\s*\(\s*"\*"\s*\)',
+        ]
 
         # for solidity
         self.match_name = None
@@ -40,7 +44,7 @@ class CVI_6019():
         self.keyword = None
 
         # for regex
-        self.unmatch = []
+        self.unmatch = [r"allowedOriginPatterns", r"Access-Control-Allow-Credentials"]
 
         self.vul_function = None
 

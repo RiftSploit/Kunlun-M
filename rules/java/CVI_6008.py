@@ -22,7 +22,7 @@ class CVI_6008():
         self.language = "java"
         self.author = "KunLun-M"
         self.vulnerability = "Insecure Cryptography"
-        self.description = "使用了不安全的加密算法（如DES、RC2、RC4、Blowfish）或弱哈希算法（如MD5、SHA-1），建议使用AES、RSA、HmacSHA256、BCrypt等安全算法。"
+        self.description = "使用了不安全的加密算法（如DES、3DES/DESede、RC2、RC4、Blowfish）或弱哈希算法（如MD5、SHA-1），建议使用AES、RSA、HmacSHA256、BCrypt等安全算法。"
         self.level = 5
 
         # status
@@ -30,7 +30,12 @@ class CVI_6008():
 
         # 部分配置
         self.match_mode = "only-regex"
-        self.match = [r'Cipher\.getInstance\(\s*"(?:DES|RC4|Blowfish)"\)']
+        self.match = [
+            r'Cipher\.getInstance\s*\(\s*"(?:DES|DESede|RC2|RC4|Blowfish)(?:/[^"]*)?"\s*\)',
+            r'MessageDigest\.getInstance\s*\(\s*"(?:MD2|MD5|SHA-?1|SHA1)"\s*\)',
+            r'KeyGenerator\.getInstance\s*\(\s*"(?:DES|DESede|RC2|RC4|Blowfish)"\s*\)',
+            r'SecretKeySpec\s*\([^,]+,\s*"(?:DES|DESede|RC2|RC4|Blowfish)"\s*\)',
+        ]
 
         # for solidity
         self.match_name = None

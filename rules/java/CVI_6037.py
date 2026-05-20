@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 """
-    Java Fastjson Deserialization (only-regex)
+    Java Fastjson Deserialization (function-param-regex)
     ~~~~
     :author:    KunLun-M
     :homepage:  https://github.com/LoRexxar/Kunlun-M
@@ -22,15 +22,15 @@ class CVI_6037():
         self.language = "java"
         self.author = "KunLun-M"
         self.vulnerability = "Fastjson Deserialization"
-        self.description = "使用了Fastjson的JSON.parseObject/parse方法进行反序列化，若未启用safeMode或AutoType黑名单，可能导致远程代码执行。建议升级Fastjson到1.2.83+或使用Fastjson2。"
+        self.description = "使用了Fastjson的JSON.parseObject/parse方法进行反序列化，若未启用safeMode或AutoType黑名单，可能导致远程代码执行。建议升级Fastjson到1.2.83+或使用Fastjson2。通过AST分析追踪数据流，检测JSON解析输入是否来自用户可控数据。"
         self.level = 9
 
         # status
         self.status = True
 
         # 部分配置
-        self.match_mode = "only-regex"
-        self.match = [r"JSON\.(?:parseObject|parse)\("]
+        self.match_mode = "function-param-regex"
+        self.match = [r"JSON\.(?:parseObject|parse)\s*\("]
 
         # for solidity
         self.match_name = None
@@ -42,7 +42,7 @@ class CVI_6037():
         # for regex
         self.unmatch = [r"safeMode", r"AutoTypeSafeCache", r"ParserConfig\.getGlobalInstance\(\)\.setAutoTypeSupport\(false\)"]
 
-        self.vul_function = None
+        self.vul_function = ["parseObject", "parse"]
 
     def main(self, regex_string):
         pass

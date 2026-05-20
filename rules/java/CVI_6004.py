@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 """
-    Java Path Traversal Rule
+    Java Path Traversal Rule (AST-enhanced)
     ~~~~
     :author:    KunLun-M
     :homepage:  https://github.com/LoRexxar/Kunlun-M
@@ -22,15 +22,15 @@ class CVI_6004():
         self.language = "java"
         self.author = "KunLun-M"
         self.vulnerability = "Path Traversal"
-        self.description = "使用用户输入构造文件路径（如new File(request)或FileInputStream(getParameter)），未进行路径校验，可能导致路径遍历漏洞。"
+        self.description = "通过AST分析检测File/FileInputStream等文件操作构造函数参数是否来自用户可控输入，追踪数据流以发现路径遍历漏洞。建议对文件路径进行normalize和getCanonicalPath校验。"
         self.level = 7
 
         # status
         self.status = True
 
         # 部分配置
-        self.match_mode = "only-regex"
-        self.match = [r"new\s+File\(.*?request"]
+        self.match_mode = "function-param-regex"
+        self.match = [r"new\s+(?:File|FileInputStream|FileOutputStream|FileReader|FileWriter)\s*\("]
 
         # for solidity
         self.match_name = None
@@ -42,7 +42,7 @@ class CVI_6004():
         # for regex
         self.unmatch = [r"normalize\(\)", r"getCanonicalPath"]
 
-        self.vul_function = None
+        self.vul_function = ["File", "FileInputStream", "FileOutputStream", "FileReader", "FileWriter"]
 
     def main(self, regex_string):
         pass

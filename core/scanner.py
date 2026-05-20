@@ -350,23 +350,56 @@ class SingleRule(object):
         elif self.sr.match_mode == const.mm_function_param_controllable:
             # 函数匹配，直接匹配敏感函数，然后处理敏感函数的参数即可
             # param controllable
-            if '|' in self.sr.match:
-                match = const.fpc_multi.replace('[f]', self.sr.match)
-                if self.sr.keyword == 'is_echo_statement':
-                    match = const.fpc_echo_statement_multi.replace('[f]', self.sr.match)
-            else:
-                match = const.fpc_single.replace('[f]', self.sr.match)
-                if self.sr.keyword == 'is_echo_statement':
-                    match = const.fpc_echo_statement_single.replace('[f]', self.sr.match)
+            
+            # 判断是否使用自定义 grep 正则（当 match 包含 \ 字符时认为是完整正则）
+            # 否则用 fpc 模板
+            match = None
+            
+            if hasattr(self.sr, 'match') and self.sr.match:
+                # 如果有 vul_function 属性且为列表，match 作为完整 grep 正则
+                use_custom_regex = (
+                    hasattr(self.sr, 'vul_function') and 
+                    isinstance(self.sr.vul_function, list) and 
+                    len(self.sr.vul_function) > 0
+                )
+                
+                if use_custom_regex:
+                    # match 字段作为完整正则（可以是列表，逐个 grep 合并结果）
+                    match = self.sr.match
+                else:
+                    # 传统模式：match 是函数名，用 fpc 模板
+                    if '|' in self.sr.match:
+                        match = const.fpc_multi.replace('[f]', self.sr.match)
+                        if self.sr.keyword == 'is_echo_statement':
+                            match = const.fpc_echo_statement_multi.replace('[f]', self.sr.match)
+                    else:
+                        match = const.fpc_single.replace('[f]', self.sr.match)
+                        if self.sr.keyword == 'is_echo_statement':
+                            match = const.fpc_echo_statement_single.replace('[f]', self.sr.match)
 
-            # 垃圾js毁一生，动态类型一时爽，静态分析火葬厂
-            if self.sr.language.lower() == "javascript":
-                match = const.fpc_loose.replace('[f]', self.sr.match)
+                    # 垃圾js毁一生，动态类型一时爽，静态分析火葬厂
+                    if self.sr.language.lower() == "javascript":
+                        match = const.fpc_loose.replace('[f]', self.sr.match)
 
             try:
                 if match:
                     f = FileParseAll(self.files, self.target_directory, language=self.lan)
-                    result = f.grep(match)
+                    
+                    # match 可能是字符串或列表
+                    if isinstance(match, list):
+                        # 多条正则，分别 grep 合并去重
+                        all_results = []
+                        seen = set()
+                        for m in match:
+                            r = f.grep(m)
+                            if r:
+                                for item in r:
+                                    if item not in seen:
+                                        seen.add(item)
+                                        all_results.append(item)
+                        result = all_results if all_results else None
+                    else:
+                        result = f.grep(match)
 
                 else:
                     result = None

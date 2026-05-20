@@ -30,7 +30,12 @@ class CVI_6020():
 
         # 部分配置
         self.match_mode = "only-regex"
-        self.match = [r"Algorithm\.none"]
+        self.match = [
+            r'Algorithm\.none\s*\(\s*\)',
+            r'\.signWith\s*\(\s*Algorithm\.none',
+            r'\.setSigningKey\s*\(\s*""\s*\)',
+            r'JWT\.require\s*\(\s*Algorithm\.none',
+        ]
 
         # for solidity
         self.match_name = None
@@ -40,7 +45,7 @@ class CVI_6020():
         self.keyword = None
 
         # for regex
-        self.unmatch = [r"HMAC", r"RSA", r"ECDSA"]
+        self.unmatch = [r"HMAC", r"RSA", r"ECDSA", r"SecretKey", r"KeyPair"]
 
         self.vul_function = None
 
