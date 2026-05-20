@@ -45,6 +45,12 @@ def _collect_member_references(expr, refs=None):
     elif isinstance(expr, javalang.tree.Assignment):
         _collect_member_references(expr.value, refs)
 
+    elif isinstance(expr, javalang.tree.ClassCreator):
+        # new SomeClass(arg1, arg2, ...) → 递归检查参数中的变量引用
+        if expr.arguments:
+            for arg in expr.arguments:
+                _collect_member_references(arg, refs)
+
     elif isinstance(expr, (list, tuple)):
         for item in expr:
             _collect_member_references(item, refs)
@@ -592,6 +598,20 @@ def _analyze_call(sink_name, arguments, lineno, controllable, repair_functions, 
             "chain": scan_chain + source_vars + [sink_name],
         }
     else:
+        # 参数不可控，但 qualifier 可控时也报告（对象本身携带可控数据）
+        if qualifier and isinstance(qualifier, str) and qualifier in controllable:
+            logger.debug("[AST][Java] Param not controllable but qualifier is: {}.{}()".format(
+                qualifier, sink_name))
+            return {
+                "code": 1,
+                "source": [qualifier],
+                "source_lineno": lineno,
+                "sink": sink_name,
+                "sink_param:": qualifier,
+                "sink_lineno": lineno,
+                "chain": scan_chain + [qualifier, sink_name],
+            }
+
         logger.debug("[AST][Java] Param not clearly controllable: {}".format(param_var_refs))
         return {
             "code": 3,

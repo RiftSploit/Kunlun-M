@@ -32,7 +32,7 @@ class CVI_6007():
 
         # 部分配置
         self.match_mode = "function-param-regex"
-        self.match = "DocumentBuilderFactory|SAXParserFactory|XMLInputFactory|SAXParser|DocumentBuilder|XMLReader"
+        self.match = "parse"
 
         # for solidity
         self.match_name = None

@@ -27,8 +27,5 @@ class CVI_6041():
         self.vul_function = ["process", "evaluate"]
 
     def main(self, regex_string):
-        """二次筛选：只保留模板引擎上下文"""
-        code = regex_string.strip() if isinstance(regex_string, str) else str(regex_string)
-        if not re.search(r'Template|Velocity|FreeMarker|freemarker|Thymeleaf|StringTemplateLoader|JdbcTemplate', code, re.I):
-            return False
+        """二次筛选：交给 AST 分析判断"""
         return None
