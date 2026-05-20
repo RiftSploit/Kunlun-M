@@ -259,6 +259,27 @@ def start(target, formatter, output, special_rules, a_sid=None, language=None, t
         ast_object.init_pre(target_directory, files)
         ast_object.pre_ast_all(main_language, is_unprecom=is_unprecom)
 
+        # 注入 JAR 反编译产生的 .java 文件到扫描列表
+        if hasattr(ast_object, 'decompiled_files') and ast_object.decompiled_files:
+            java_entry_index = None
+            for i, (ext, data) in enumerate(files):
+                if ext == '.java':
+                    java_entry_index = i
+                    break
+
+            decompiled_count = len(ast_object.decompiled_files)
+            if java_entry_index is not None:
+                ext, data = files[java_entry_index]
+                data['list'].extend(ast_object.decompiled_files)
+                data['count'] = len(data['list'])
+                files[java_entry_index] = (ext, data)
+            else:
+                files.append(('.java', {
+                    'count': decompiled_count,
+                    'list': ast_object.decompiled_files
+                }))
+            logger.info("[SCAN] JAR 反编译产生 {} 个 .java 文件已加入扫描列表".format(decompiled_count))
+
         # scan
         scan(target_directory=target_directory, a_sid=a_sid, s_sid=s_sid, special_rules=pa.special_rules,
              language=main_language, framework=main_framework, file_count=file_count, extension_count=len(files),

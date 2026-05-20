@@ -146,3 +146,6 @@ progress.md
 
 # php tools
 */.kunlunm_unserialize_poc/*
+
+# Java decompiler
+tools/cfr.jar

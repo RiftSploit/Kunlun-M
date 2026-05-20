@@ -29,6 +29,7 @@ import traceback
 import zipfile
 import queue
 import asyncio
+import subprocess
 from collections.abc import Hashable
 
 could_ast_pase_lans = ["php", "chromeext", "javascript", "html", "java"]
@@ -45,6 +46,7 @@ class Pretreatment:
 
         self.pre_result = {}
         self.define_dict = {}
+        self.decompiled_files = []
 
         # self.pre_ast_all()
 
@@ -92,6 +94,25 @@ class Pretreatment:
             return key_node
 
         return repr(key_node)
+
+    def _ensure_cfr(self):
+        """确保 CFR 反编译器可用，不存在则自动下载"""
+        # 先检查项目 tools 目录
+        cfr_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'tools', 'cfr.jar')
+        if os.path.isfile(cfr_path):
+            return cfr_path
+
+        # 自动下载
+        try:
+            import urllib.request
+            cfr_url = "https://repo1.maven.org/maven2/org/benf/cfr/0.152/cfr-0.152.jar"
+            os.makedirs(os.path.dirname(cfr_path), exist_ok=True)
+            logger.info("[AST] [JAR] 下载 CFR 反编译器...")
+            urllib.request.urlretrieve(cfr_url, cfr_path)
+            return cfr_path
+        except Exception as e:
+            logger.warning("[AST] [JAR] CFR 下载失败: {}".format(str(e)))
+            return None
 
     def pre_ast_all(self, lan=None, is_unprecom=False):
 
@@ -490,6 +511,60 @@ class Pretreatment:
                     except:
                         logger.warning('[AST] something error, {}'.format(traceback.format_exc()))
                         continue
+
+            elif fileext[0] == '.jar' and 'java' in self.lan:
+                # 针对 JAR 文件的反编译预处理
+                for filepath in fileext[1]['list']:
+                    filepath = self.get_path(filepath)
+                    self.pre_result[filepath] = {}
+                    self.pre_result[filepath]['language'] = 'java'
+                    self.pre_result[filepath]['ast_nodes'] = []
+                    self.pre_result[filepath]['type'] = 'jar'
+
+                    try:
+                        # 1. 确保有 CFR
+                        cfr_path = self._ensure_cfr()
+                        if not cfr_path:
+                            logger.warning("[AST] [JAR] CFR 不可用，跳过反编译: {}".format(filepath))
+                            continue
+
+                        # 2. 反编译 JAR（CFR 直接接受 .jar 文件作为输入）
+                        decompiled_dir = filepath + "_decompiled/"
+                        if not os.path.isdir(decompiled_dir) or not os.listdir(decompiled_dir):
+                            os.makedirs(decompiled_dir, exist_ok=True)
+                            subprocess.run(
+                                ['java', '-jar', cfr_path, filepath, '--outputdir', decompiled_dir],
+                                capture_output=True, timeout=120
+                            )
+
+                        self.pre_result[filepath]['decompiled_dir'] = decompiled_dir
+
+                        # 3. 遍历反编译输出的 .java 文件，做 AST 解析
+                        for root, dirs, java_files in os.walk(decompiled_dir):
+                            for jf in java_files:
+                                if jf.endswith('.java'):
+                                    java_path = os.path.join(root, jf)
+                                    self.pre_result[java_path] = {}
+                                    self.pre_result[java_path]['language'] = 'java'
+                                    self.pre_result[java_path]['ast_nodes'] = []
+                                    self.pre_result[java_path]['source_jar'] = filepath
+
+                                    try:
+                                        with codecs.open(java_path, 'r', encoding='utf-8', errors='ignore') as f:
+                                            code = f.read()
+                                        if not self.is_unprecom:
+                                            tree = javalang.parse.parse(code)
+                                            self.pre_result[java_path]['ast_nodes'] = tree
+                                    except javalang.parser.JavaSyntaxError:
+                                        logger.warning("[AST] [JAR] 反编译文件语法错误: {}".format(java_path))
+                                    except Exception:
+                                        logger.warning("[AST] [JAR] 解析异常: {}".format(traceback.format_exc()))
+
+                                    # 加入反编译文件列表，供后续扫描使用
+                                    self.decompiled_files.append(java_path)
+
+                    except Exception:
+                        logger.warning("[AST] [JAR] 处理异常: {}".format(traceback.format_exc()))
 
             elif fileext[0] in ext_dict['java'] and 'java' in self.lan:
                 # 针对 Java 的预处理
