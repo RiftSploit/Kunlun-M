@@ -14,7 +14,7 @@ class CVI_6024():
         self.match_mode = "regex-return-regex"
         self.match = [r"new\s+URL\(=padding=\)"]
         self.unmatch = []
-        self.match_name = r"String\s+(\w+)\s*=\s*request\.getParameter\([^)]*\)"
+        self.match_name = r"(?:String\s+(\w+)\s*=\s*request\.(?:getParameter|getHeader|getInputStream|getReader|getQueryString|getParameterValues|getParameterMap|getCookies)\([^)]*\)|@(?:RequestParam|PathVariable|RequestHeader|CookieValue|QueryParam|FormParam)\s*(?:\([^)]*\)\s*)?String\s+(\w+))"
         self.black_list = []
         self.keyword = None
         self.vul_function = None

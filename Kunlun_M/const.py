@@ -64,7 +64,7 @@ ext_dict = {
     "javascript": ['.js'],
     "chromeext": ['.crx'],
     "html": ['.html'],
-    "java": ['.java', '.jar'],
+    "java": ['.java', '.jar', '.xml'],
     "base": ['*']
 }
 

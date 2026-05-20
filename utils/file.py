@@ -475,13 +475,16 @@ class FileParseAll:
                 re_flag = True
                 # 正确使用，即reg = '(function aloha (_to) aloha)'，re_result形如 ("function balanceOf(address owner);","_to")
                 if len(re_result) == 2:# ['owner','function xxx(address owner)']
+                    # 优先取 group(1)（变量名），若为空则取 group(0)
+                    # 兼容双分支正则：Servlet 模式 ('name','') / 注解模式 ('','name')
+                    var_name = re_result[1] if re_result[1] else re_result[0]
                     for black in black_list:
                         if black in re_result[0] or black in re_result[1]:
                             re_flag = False
                             logger.debug('[DEBUG] [GREP_NAME_BLACK_LIST] match varname {0} in black list {1}'.format(re_result[0], black))
                     if re_flag:
-                        name.append(re_result[1])
-                        logger.debug('[DEBUG] [GREP_NAME_WITH_GROUP(0)_BLACK_CHECK] success match varname:{0}'.format(re_result[0]))
+                        name.append(var_name)
+                        logger.debug('[DEBUG] [GREP_NAME_WITH_GROUP(0)_BLACK_CHECK] success match varname:{0}'.format(var_name))
                 elif len(re_result) == 1: # ['owner']
                     for black in black_list:
                         if black in re_result[0]:

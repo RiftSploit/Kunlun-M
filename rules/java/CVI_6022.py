@@ -14,7 +14,7 @@ class CVI_6022():
         self.match_mode = "regex-return-regex"
         self.match = [r"getWriter\(\)\.print\(.*?=padding="]
         self.unmatch = [r"encode", r"escape", r"HtmlUtils", r"ESAPI"]
-        self.match_name = r"String\s+(\w+)\s*=\s*request\.getParameter\([^)]*\)"
+        self.match_name = r"(?:String\s+(\w+)\s*=\s*request\.(?:getParameter|getHeader|getInputStream|getReader|getQueryString|getParameterValues|getParameterMap|getCookies)\([^)]*\)|@(?:RequestParam|PathVariable|RequestHeader|CookieValue|QueryParam|FormParam)\s*(?:\([^)]*\)\s*)?String\s+(\w+))"
         self.black_list = []
         self.keyword = None
         self.vul_function = None
