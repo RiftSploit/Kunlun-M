@@ -1,13 +1,14 @@
 language: python
 python:
-  - "3.6"
-  - "3.7"
+  - "3.11"
+before_install:
+  - sudo apt-get update -qq
+  - sudo apt-get install -y default-libmysqlclient-dev build-essential pkg-config
 install:
   - pip install coveralls
   - pip install -r requirements.txt
-  - mv Kunlun_M/settings.py.bak Kunlun_M/settings.py
 script:
-  - py.test
+  - pytest
   - coverage run --source=core -m pytest
 after_success:
   - coveralls

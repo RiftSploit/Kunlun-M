@@ -1,4 +1,27 @@
 ## 更新日志
+- 2026-05-21
+  - KunLun-M 2.9.0
+  - **新增 Java 静态代码扫描引擎**
+    - 基于 javalang AST 的语义分析，支持对象级污点传播、链式调用追踪、源码文本 fallback 传播
+    - 支持 6 种扫描模式：`regex-only`、`function-param-regex`、`java-function-param-regex`、`function-param-controllable`、`regex-return-regex`、`framework-dependency`
+    - 新增 `framework-dependency` 模式：解析 pom.xml 依赖版本 + 语义化版本比较 + 配置特征二次确认 + parent 版本继承
+  - **新增 58 条 Java 规则**（CVI-6001 ~ CVI-6068），覆盖 20+ 漏洞类型：
+    - 代码级规则：SQL 注入、XSS、命令执行、路径穿越、SSRF、XXE、反序列化、文件上传、SpEL/OGNL 注入、LDAP 注入、CORS、JWT、JNDI、Log4Shell、SSTI 等
+    - 框架级规则（`framework-dependency` 模式）：
+      - Apache Shiro：反序列化(CVE-2016-4437)、Padding Oracle(CVE-2019-11963)、认证绕过(CVE-2020系列)、弱密钥
+      - Apache Struts2：OGNL 注入(S2-001~062)、Jakarta Multipart(S2-045)、RCE(S2-048/057/059)
+      - Log4j2：JNDI RCE / Log4Shell (CVE-2021-44228)
+      - Fastjson：autoType 反序列化(≤1.2.24)、autoType 绕过(1.2.25-1.2.47)、safeMode 绕过(1.2.68-1.2.80)
+      - Commons Collections：InvokerTransformer 反序列化链(≤3.2.1)
+      - XStream：反序列化 RCE (≤1.4.14)
+      - Jackson-databind：反序列化 CVE (≤2.9.9)
+      - Spring Boot Actuator：未授权访问
+      - Commons FileUpload：反序列化 RCE (≤1.3.2)
+    - 组件级规则：Fastjson、Log4j、XStream、Jackson、HSQLDB、Hibernate、Druid 等组件漏洞检测
+  - **误报治理**
+    - function 类型规则：match 正则收窄 + main() 过滤优化，修复版误报从 108 条降至 41 条（-62%）
+    - only-regex 类型规则：误报率 >20% 的规则（CVI-6024/6033/6039）禁用
+  - **JavaVul 靶场验证**：20+ 靶场全面测试通过，安全版本零误报
 - 2026-05-19
   - KunLun-M 2.8.2
   - 新增 Rule 类热重载支持

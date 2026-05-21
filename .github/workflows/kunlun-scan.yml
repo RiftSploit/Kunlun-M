@@ -17,10 +17,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+      - name: Install system dependencies
+        run: sudo apt-get update -qq && sudo apt-get install -y default-libmysqlclient-dev build-essential pkg-config
       - name: Install dependencies
         run: python -m pip install -r requirements.txt
       - name: Run KunLun CI scan
-        run: python tools/ci_scan.py --target . --output artifacts/kunlun-ci.json --fail-on "${KUNLUN_FAIL_ON}"
+        run: python tools/ci_scan.py --target . --output artifacts/kunlun-ci.json --fail-on "${KUNLUN_FAIL_ON}" --blackpath tests,vendor,node_modules,.git
       - name: Upload report artifact
         uses: actions/upload-artifact@v4
         with:

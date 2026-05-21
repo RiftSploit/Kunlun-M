@@ -1,0 +1,38 @@
+# -*- coding: utf-8 -*-
+from utils.api import *
+
+
+class CVI_6043():
+    """
+    JdbcTemplate SQL Injection — 检测 Spring JdbcTemplate 的 query/queryForObject/execute/update 
+    方法参数是否来自用户可控输入的字符串拼接 SQL
+    """
+    def __init__(self):
+        self.svid = 6043
+        self.language = "java"
+        self.author = "KunLun-M"
+        self.vulnerability = "JdbcTemplate SQL Injection"
+        self.description = "检测Spring JdbcTemplate的query/queryForObject等方法参数是否为用户可控的拼接SQL"
+        self.level = 9
+        self.status = True
+        self.match_mode = "java-function-param-regex"
+        # 精确匹配 JdbcTemplate 方法名（避免匹配其他 query 调用）
+        self.match = r"jdbcTemplate\.query\b|jdbcTemplate\.queryForObject|jdbcTemplate\.queryForList|jdbcTemplate\.queryForMap|jdbcTemplate\.queryForRowSet|jdbcTemplate\.execute\b|jdbcTemplate\.update\b"
+        self.unmatch = []
+        self.match_name = None
+        self.black_list = []
+        self.keyword = None
+        # AST 搜索 sink 函数名
+        self.vul_function = ["query", "queryForObject", "queryForList", "queryForMap", "queryForRowSet", "execute", "update"]
+
+    def main(self, regex_string):
+        """二次筛选：确认是 JdbcTemplate 调用上下文"""
+        if not isinstance(regex_string, str):
+            regex_string = str(regex_string)
+        # 确认代码行包含 JdbcTemplate 相关调用
+        if re.search(r'jdbcTemplate|JdbcTemplate', regex_string, re.I):
+            return True
+        # query/queryForObject 如果直接出现在代码行中也保留
+        if re.search(r'\.query\(|\.queryForObject\(|\.queryForList\(|\.queryForMap\(|\.queryForRowSet\(', regex_string):
+            return None  # 让 AST 分析判断
+        return False

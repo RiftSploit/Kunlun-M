@@ -16,6 +16,7 @@ import traceback
 
 from core.core_engine.php.parser import scan_parser as php_scan_parser
 from core.core_engine.javascript.parser import scan_parser as js_scan_parser
+from core.core_engine.java.parser import scan_parser as java_scan_parser
 
 from .cast import CAST
 from .filters import VulnerabilityFilter
@@ -108,6 +109,13 @@ class VulnerabilityMatcher(object):
             b = __import__('rules.tamper.demo', fromlist=['PHP_IS_CONTROLLED_DEFAULT'])
             self.controlled_list = getattr(b, 'PHP_IS_CONTROLLED_DEFAULT')
 
+        elif self.lan == "java":
+            a = __import__('rules.tamper.demo_java', fromlist=['JAVA_IS_REPAIR_DEFAULT'])
+            self.repair_dict = getattr(a, 'JAVA_IS_REPAIR_DEFAULT')
+
+            b = __import__('rules.tamper.demo_java', fromlist=['JAVA_IS_CONTROLLED_DEFAULT'])
+            self.controlled_list = getattr(b, 'JAVA_IS_CONTROLLED_DEFAULT')
+
         # 如果指定加载某个tamper，那么无视语言
         if self.tamper_name is not None:
             try:
@@ -171,6 +179,7 @@ class VulnerabilityMatcher(object):
             'solidity': self._scan_solidity,
             'javascript': self._scan_javascript,
             'chromeext': self._scan_chromeext,
+            'java': self._scan_java,
         }
         handler = dispatch.get(self.lan, self._scan_generic)
         return handler()
@@ -189,7 +198,11 @@ class VulnerabilityMatcher(object):
                 return True, 'Function-param-controllable', r['chain']
 
         for r in result:
-            if r['code'] == 4:  # 新规则生成
+            if r['code'] == 4:  # 配置型漏洞 / 新规则生成
+                # 区分：如果有 chain 且包含 sink 名，视为配置型漏洞（code 1 等价）
+                # 否则视为新规则生成信号
+                if r.get('chain') and len(r['chain']) > 1:
+                    return True, 'Config-vulnerability-confirmed', r['chain']
                 return False, 'New Core', r['source']
 
         for r in result:
@@ -378,6 +391,83 @@ class VulnerabilityMatcher(object):
                 return True, 'Specail-crx-keyword-match'
             else:
                 logger.warn("[CVI-{cvi} [OTHER-MATCH]] chrome ext rules not support it...".format(cvi=self.cvi))
+                return False, 'Unsupport Match'
+
+        except Exception as e:
+            logger.debug(traceback.format_exc())
+            return False, 'Exception'
+
+    def _scan_java(self):
+        """Java 扫描（支持 only-regex、regex-return-regex、function-param-controllable）"""
+        try:
+            ast = CAST(self.rule_match, self.target_directory, self.file_path, self.line_number,
+                       self.code_content, files=self.files, rule_class=self.single_rule,
+                       repair_functions=self.repair_functions)
+
+            if self.rule_match_mode == const.mm_regex_only_match:
+                logger.debug("[CVI-{cvi}] [ONLY-MATCH]".format(cvi=self.cvi))
+                return True, 'Regex-only-match'
+
+            elif self.rule_match_mode == const.mm_regex_return_regex:
+                logger.debug("[CVI-{cvi}] [REGEX-RETURN-REGEX]".format(cvi=self.cvi))
+                return True, 'Regex-return-regex'
+
+            elif self.rule_match_mode in (const.mm_function_param_controllable,
+                                           const.mm_java_function_param_controllable):
+                # 调用规则的 main() 做二次筛选（类似 PHP cast.py:212 的 self.sr.main()）
+                # 优先传完整源码行（而非 grep 片段），让 main() 能看到上下文
+                main_input = self.code_content
+                try:
+                    with open(self.file_path, 'r', encoding='utf-8', errors='replace') as f:
+                        source_lines = f.readlines()
+                    idx = int(self.line_number) - 1
+                    if 0 <= idx < len(source_lines):
+                        main_input = source_lines[idx].strip()
+                except Exception:
+                    pass
+                main_result = self.single_rule.main(main_input)
+                if main_result is not None and main_result is not False:
+                    # main() 返回非 None/False → 通过二次筛选，继续 AST 分析
+                    pass
+                elif main_result is False:
+                    logger.debug('[CVI-{cvi}] main() returned False, skip'.format(cvi=self.cvi))
+                    return False, 'Filtered by rule.main()'
+                # main() 返回 None → 不做二次筛选（默认 pass），继续 AST 分析
+
+                # 确定用于 AST 分析的函数名列表
+                if (hasattr(self.single_rule, 'vul_function') and
+                    isinstance(self.single_rule.vul_function, list) and
+                    len(self.single_rule.vul_function) > 0):
+                    rule_match = self.single_rule.vul_function
+                else:
+                    rule_match = self.rule_match.strip('()').split('|')
+                logger.debug('[RULE_MATCH] {r}'.format(r=rule_match))
+                try:
+                    # 获取规则是否声明为配置型漏洞
+                    is_config_vuln = getattr(self.single_rule, 'is_config_vuln', False)
+                    result = java_scan_parser(rule_match, self.line_number, self.file_path,
+                                              repair_functions=self.repair_functions,
+                                              controlled_params=self.controlled_list,
+                                              is_config_vuln=is_config_vuln)
+                    logger.debug('[AST] [RET] {c}'.format(c=result))
+                    if len(result) > 0:
+                        parsed = self._parse_ast_result(result)
+                        if parsed is not None:
+                            return parsed
+                    else:
+                        logger.debug(
+                            '[AST] Parser failed / vulnerability parameter is not controllable {r}'.format(
+                                r=result))
+                        return False, 'Can\'t parser'
+                except Exception:
+                    exc_msg = traceback.format_exc()
+                    logger.warning(exc_msg)
+                    raise
+
+            else:
+                logger.warn(
+                    "[CVI-{cvi}] Java unsupported match mode: {m}".format(
+                        cvi=self.cvi, m=self.rule_match_mode))
                 return False, 'Unsupport Match'
 
         except Exception as e:

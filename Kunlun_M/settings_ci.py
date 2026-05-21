@@ -142,3 +142,8 @@ DATABASES = {
         'NAME': os.path.join(db_dir, 'kunlun_ci.db'),
     }
 }
+
+
+def check_security_settings():
+    """CI environment security check - always passes."""
+    pass

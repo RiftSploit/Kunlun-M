@@ -328,8 +328,8 @@ class SingleRule(object):
                 else:
                     result = None
             except Exception as e:
-                traceback.print_exc()
                 logger.debug('match exception ({e})'.format(e=e))
+                logger.debug(traceback.format_exc())
                 return None
 
         elif self.sr.match_mode == const.mm_regex_param_controllable:
@@ -343,36 +343,65 @@ class SingleRule(object):
                 else:
                     result = None
             except Exception as e:
-                traceback.print_exc()
                 logger.debug('match exception ({e})'.format(e=e))
+                logger.debug(traceback.format_exc())
                 return None
 
-        elif self.sr.match_mode == const.mm_function_param_controllable:
+        elif self.sr.match_mode in (const.mm_function_param_controllable,
+                                     const.mm_java_function_param_controllable):
             # 函数匹配，直接匹配敏感函数，然后处理敏感函数的参数即可
             # param controllable
-            if '|' in self.sr.match:
-                match = const.fpc_multi.replace('[f]', self.sr.match)
-                if self.sr.keyword == 'is_echo_statement':
-                    match = const.fpc_echo_statement_multi.replace('[f]', self.sr.match)
-            else:
-                match = const.fpc_single.replace('[f]', self.sr.match)
-                if self.sr.keyword == 'is_echo_statement':
-                    match = const.fpc_echo_statement_single.replace('[f]', self.sr.match)
+            
+            match = None
+            
+            if hasattr(self.sr, 'match') and self.sr.match:
+                if self.sr.match_mode == const.mm_java_function_param_controllable:
+                    # Java 专用模式：match 字段直接作为 grep 正则，不套 fpc 模板
+                    match = self.sr.match
+                elif (hasattr(self.sr, 'vul_function') and
+                      isinstance(self.sr.vul_function, list) and
+                      len(self.sr.vul_function) > 0):
+                    # 有 vul_function → match 作为完整正则
+                    match = self.sr.match
+                else:
+                    # 传统 PHP/JS 模式：match 是函数名，用 fpc 模板
+                    if '|' in self.sr.match:
+                        match = const.fpc_multi.replace('[f]', self.sr.match)
+                        if self.sr.keyword == 'is_echo_statement':
+                            match = const.fpc_echo_statement_multi.replace('[f]', self.sr.match)
+                    else:
+                        match = const.fpc_single.replace('[f]', self.sr.match)
+                        if self.sr.keyword == 'is_echo_statement':
+                            match = const.fpc_echo_statement_single.replace('[f]', self.sr.match)
 
-            # 垃圾js毁一生，动态类型一时爽，静态分析火葬厂
-            if self.sr.language.lower() == "javascript":
-                match = const.fpc_loose.replace('[f]', self.sr.match)
+                    if self.sr.language.lower() == "javascript":
+                        match = const.fpc_loose.replace('[f]', self.sr.match)
 
             try:
                 if match:
                     f = FileParseAll(self.files, self.target_directory, language=self.lan)
-                    result = f.grep(match)
+                    
+                    # match 可能是字符串或列表
+                    if isinstance(match, list):
+                        # 多条正则，分别 grep 合并去重
+                        all_results = []
+                        seen = set()
+                        for m in match:
+                            r = f.grep(m)
+                            if r:
+                                for item in r:
+                                    if item not in seen:
+                                        seen.add(item)
+                                        all_results.append(item)
+                        result = all_results if all_results else None
+                    else:
+                        result = f.grep(match)
 
                 else:
                     result = None
             except Exception as e:
-                traceback.print_exc()
                 logger.debug('match exception ({e})'.format(e=e))
+                logger.debug(traceback.format_exc())
                 return None
 
         elif self.sr.match_mode == const.mm_regex_return_regex:
@@ -392,8 +421,8 @@ class SingleRule(object):
                 if not result:
                     result = None
             except Exception as e:
-                traceback.print_exc()
                 logger.debug('match exception ({e})'.format(e=e))
+                logger.debug(traceback.format_exc())
                 return None
 
         elif self.sr.match_mode == const.sp_crx_keyword_match:
@@ -412,8 +441,8 @@ class SingleRule(object):
                 if not result:
                     result = None
             except Exception as e:
-                traceback.print_exc()
                 logger.debug('match exception ({e})'.format(e=e))
+                logger.debug(traceback.format_exc())
                 return None
 
         elif self.sr.match_mode == const.file_path_regex_match:
@@ -430,8 +459,55 @@ class SingleRule(object):
                 if not result:
                     result = None
             except Exception as e:
-                traceback.print_exc()
                 logger.debug('match exception ({e})'.format(e=e))
+                logger.debug(traceback.format_exc())
+                return None
+
+        elif self.sr.match_mode == const.mm_framework_dependency:
+            # 框架依赖版本检测: 解析 pom.xml/build.gradle, 版本范围匹配 + 配置特征二次确认
+            from utils.pom_parser import check_framework_dependency, search_code_patterns
+
+            result = []
+
+            try:
+                framework_deps = getattr(self.sr, 'framework_deps', [])
+                config_patterns = getattr(self.sr, 'config_patterns', [])
+                exclude_patterns = getattr(self.sr, 'exclude_patterns', [])
+
+                for dep_config in framework_deps:
+                    matched_deps = check_framework_dependency(self.target_directory, dep_config)
+
+                    for matched in matched_deps:
+                        pom_path = matched['pom']
+                        version = matched['version']
+                        cve = matched.get('cve', '')
+                        desc = matched.get('description', '')
+
+                        # 二次确认: config_patterns
+                        if config_patterns:
+                            config_files = search_code_patterns(self.target_directory, config_patterns)
+                            if not config_files:
+                                logger.debug(f'[FRAMEWORK] config patterns not found, skip {cve}')
+                                continue
+
+                        # 排除检查: exclude_patterns
+                        if exclude_patterns:
+                            exclude_files = search_code_patterns(self.target_directory, exclude_patterns)
+                            if exclude_files:
+                                logger.debug(f'[FRAMEWORK] exclude patterns found, skip {cve}')
+                                continue
+
+                        # 格式化为统一的 result tuple: (file_path, line_number, match_text)
+                        match_text = f"{dep_config['group_id']}:{dep_config['artifact_id']}:{version}"
+                        if cve:
+                            match_text += f" ({cve})"
+                        result.append((pom_path, "0", match_text))
+
+                if not result:
+                    result = None
+            except Exception as e:
+                logger.debug(f'framework-dependency match exception ({e})')
+                logger.debug(traceback.format_exc())
                 return None
 
         else:
@@ -455,6 +531,22 @@ class SingleRule(object):
         if origin_results == '' or origin_results is None:
             logger.debug('[CVI-{cvi}] [ORIGIN] NOT FOUND!'.format(cvi=self.sr.svid))
             return None
+
+        # framework-dependency 模式: 直接生成结果，不需要 AST 分析
+        if self.sr.match_mode == const.mm_framework_dependency:
+            for index, origin_vulnerability in enumerate(origin_results):
+                vulnerability = VulnerabilityResult.from_match(origin_vulnerability, svid=self.sr.svid,
+                                                                language=self.sr.language,
+                                                                rule_name=self.sr.vulnerability,
+                                                                author=self.sr.author)
+                if vulnerability:
+                    cve_info = origin_vulnerability[2] if len(origin_vulnerability) > 2 else ''
+                    vulnerability.analysis = f"Framework dependency vulnerability: {cve_info}"
+                    vulnerability.chain = [("Dependency", cve_info, origin_vulnerability[0], 0)]
+                    self.rule_vulnerabilities.append(vulnerability)
+            logger.debug('[CVI-{cvi}] {vn} Vulnerabilities: {count}'.format(cvi=self.sr.svid, vn=self.sr.vulnerability,
+                                                                            count=len(self.rule_vulnerabilities)))
+            return self.rule_vulnerabilities
 
         origin_vulnerabilities = origin_results
         for index, origin_vulnerability in enumerate(origin_vulnerabilities):

@@ -20,5 +20,8 @@ portalocker>=2.8.2
 requests>=2.32.3
 rarfile>=4.2
 
+# Java source parsing
+javalang>=0.13.0
+
 # Database drivers
 mysqlclient>=2.2.4

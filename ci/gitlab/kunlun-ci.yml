@@ -9,6 +9,8 @@ kunlun_ci_scan:
     KUNLUN_INCLUDE_UNCONFIRM: "0"
     KUNLUN_WITH_VENDOR: "0"
   before_script:
+    - apt-get update -qq
+    - apt-get install -y default-libmysqlclient-dev build-essential pkg-config
     - python -m pip install -r requirements.txt
   script:
     - python tools/ci_scan.py --target . --output artifacts/kunlun-ci.json --fail-on "${KUNLUN_FAIL_ON}"
