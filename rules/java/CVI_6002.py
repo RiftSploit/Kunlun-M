@@ -24,7 +24,7 @@ class CVI_6002():
         self.level = 3
 
         # status
-        self.status = False
+        self.status = True
 
         # 部分配置
         self.match_mode = "function-param-regex"
@@ -50,6 +50,9 @@ class CVI_6002():
     def main(self, regex_string):
         if not isinstance(regex_string, str):
             regex_string = str(regex_string)
+        # 排除 import 语句
+        if regex_string.lstrip().startswith("import "):
+            return False
         # 排除文件操作
         if re.search(r"Files\.write|FileOutputStream|FileWriter|System\.out|System\.err", regex_string):
             return False

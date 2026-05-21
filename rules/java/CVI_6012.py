@@ -17,7 +17,7 @@ class CVI_6012():
         self.description = "用户输入进入SpEL/OGNL表达式解析可能导致代码注入"
         self.level = 4
 
-        self.status = False
+        self.status = True
         self.match_mode = "function-param-regex"
         self.match = "parseExpression|getValue"
         self.match_name = None

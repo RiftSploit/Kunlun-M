@@ -28,11 +28,11 @@ class CVI_6006():
         self.level = 7
 
         # status
-        self.status = False
+        self.status = True
 
         # 部分配置
         self.match_mode = "function-param-regex"
-        self.match = "openConnection|URL|RestTemplate|HttpClient"
+        self.match = r"new\s+URL\(|\.openConnection\(\)|\.openStream\(\)|new\s+RestTemplate\(|new\s+OkHttpClient\(|new\s+DefaultHttpClient\(|new\s+HttpClient\(|Request\.Get\(|Request\.Post\("
 
         # for solidity
         self.match_name = None

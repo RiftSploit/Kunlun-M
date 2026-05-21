@@ -17,9 +17,9 @@ class CVI_6015():
         self.description = "用户可控的重定向URL可能导致开放重定向攻击"
         self.level = 2
 
-        self.status = False
+        self.status = True
         self.match_mode = "function-param-regex"
-        self.match = "sendRedirect"
+        self.match = r"\.sendRedirect\s*\(|redirect:"
         self.match_name = None
         self.black_list = None
         self.keyword = None

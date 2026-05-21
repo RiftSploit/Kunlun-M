@@ -28,11 +28,11 @@ class CVI_6007():
         self.level = 8
 
         # status
-        self.status = False
+        self.status = True
 
         # 部分配置
         self.match_mode = "function-param-regex"
-        self.match = "parse"
+        self.match = r"\.parse\s*\(|newSAXParser|parseText|SAXParser|SAXBuilder|SAXReader|DocumentBuilder|XMLReader|Digester"
 
         # for solidity
         self.match_name = None

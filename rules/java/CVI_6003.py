@@ -28,7 +28,7 @@ class CVI_6003():
         self.level = 9
 
         # status
-        self.status = False
+        self.status = True
 
         # 部分配置
         self.match_mode = "function-param-regex"
@@ -51,6 +51,9 @@ class CVI_6003():
         """二次筛选：确认 Runtime.exec/ProcessBuilder 调用"""
         if not isinstance(regex_string, str):
             regex_string = str(regex_string)
+        # 排除 Playground scenario 字符串
+        if re.search(r'scenario', regex_string, re.I):
+            return False
         # exec 需要确认是 Runtime.exec 上下文
         if re.search(r'exec\s*\(', regex_string):
             if not re.search(r'Thread|Executor|pool|execute', regex_string, re.I):

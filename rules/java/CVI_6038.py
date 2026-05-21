@@ -26,7 +26,7 @@ class CVI_6038():
         self.level = 9
 
         # status
-        self.status = False
+        self.status = True
 
         # 部分配置
         # ProcessBuilder 通过 ClassCreator 匹配，match 为精确正则避免匹配注释
@@ -47,4 +47,9 @@ class CVI_6038():
         self.vul_function = ["ProcessBuilder"]
 
     def main(self, regex_string):
-        pass
+        if not isinstance(regex_string, str):
+            regex_string = str(regex_string)
+        # 排除 Playground scenario 字符串
+        if re.search(r'scenario', regex_string, re.I):
+            return False
+        return None
