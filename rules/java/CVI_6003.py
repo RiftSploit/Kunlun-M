@@ -28,7 +28,7 @@ class CVI_6003():
         self.level = 9
 
         # status
-        self.status = True
+        self.status = False
 
         # 部分配置
         self.match_mode = "function-param-regex"

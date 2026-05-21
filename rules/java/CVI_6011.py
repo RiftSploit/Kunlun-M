@@ -17,7 +17,7 @@ class CVI_6011():
         self.description = "用户可控的文件上传可能导致恶意文件上传攻击"
         self.level = 3
 
-        self.status = True
+        self.status = False
         self.match_mode = "function-param-regex"
         self.match = "transferTo|getInputStream|getBytes|getOriginalFilename"
         self.match_name = None

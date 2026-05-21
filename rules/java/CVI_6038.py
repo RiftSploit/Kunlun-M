@@ -26,7 +26,7 @@ class CVI_6038():
         self.level = 9
 
         # status
-        self.status = True
+        self.status = False
 
         # 部分配置
         # ProcessBuilder 通过 ClassCreator 匹配，match 为精确正则避免匹配注释

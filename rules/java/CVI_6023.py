@@ -10,7 +10,7 @@ class CVI_6023():
         self.vulnerability = "ProcessBuilder Command Injection"
         self.description = "请求参数直接传入ProcessBuilder构建命令，存在命令注入风险"
         self.level = 9
-        self.status = True
+        self.status = False
         self.match_mode = "regex-return-regex"
         self.match = [r"new\s+ProcessBuilder\(.*?=padding="]
         self.unmatch = []

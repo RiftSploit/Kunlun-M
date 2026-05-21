@@ -17,7 +17,7 @@ class CVI_6041():
         self.description = "用户输入进入模板引擎渲染可能导致服务端模板注入"
         self.level = 4
 
-        self.status = True
+        self.status = False
         self.match_mode = "function-param-regex"
         self.match = "process|evaluate"
         self.match_name = None

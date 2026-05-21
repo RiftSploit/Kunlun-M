@@ -10,7 +10,7 @@ class CVI_6032():
         self.vulnerability = "Command Injection (function-param-controllable)"
         self.description = "通过AST分析检测Runtime.exec参数是否来自用户可控输入"
         self.level = 9
-        self.status = True
+        self.status = False
         self.match_mode = "java-function-param-regex"
         self.match = "exec"
         self.unmatch = []

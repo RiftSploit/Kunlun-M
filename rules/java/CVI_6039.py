@@ -19,7 +19,7 @@ class CVI_6039():
         self.vulnerability = "MyBatis SQL Injection (${...} interpolation)"
         self.description = "MyBatis mapper中使用${...}进行字符串拼接而非#{...}参数化查询，存在SQL注入风险"
         self.level = 8
-        self.status = True
+        self.status = False
         self.match_mode = "only-regex"
         self.match = [
             r'\$\{[a-zA-Z_]\w*(?:\.\w+)*\}',
