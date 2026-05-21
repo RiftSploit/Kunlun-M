@@ -28,6 +28,10 @@ class CVI_6011():
 
 
     def main(self, regex_string):
-        """upload 相关方法已足够精确，不需要额外筛选"""
+        if not isinstance(regex_string, str):
+            regex_string = str(regex_string)
+        # 排除有扩展名白名单校验的写法
+        if re.search(r"ALLOWED_EXTENSIONS|allowedExtensions|isValidExtension|checkFileType|ImageIO\.read|MimeTypeUtils", regex_string, re.I):
+            return False
         return None
 

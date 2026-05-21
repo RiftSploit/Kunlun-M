@@ -10,7 +10,7 @@ class CVI_6024():
         self.vulnerability = "SSRF via Request Parameter"
         self.description = "请求参数直接用于构建URL对象发起网络请求，存在SSRF风险"
         self.level = 7
-        self.status = True
+        self.status = False
         self.match_mode = "regex-return-regex"
         self.match = [r"new\s+URL\(=padding=\)"]
         self.unmatch = []

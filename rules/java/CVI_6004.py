@@ -32,7 +32,7 @@ class CVI_6004():
 
         # 部分配置
         self.match_mode = "function-param-regex"
-        self.match = "File|FileInputStream|FileOutputStream|FileReader|FileWriter"
+        self.match = r"new\s+File\(|new\s+FileInputStream\(|new\s+FileOutputStream\(|new\s+FileReader\(|new\s+FileWriter\("
 
         # for solidity
         self.match_name = None

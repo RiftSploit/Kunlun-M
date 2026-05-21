@@ -27,5 +27,9 @@ class CVI_6015():
         self.vul_function = ["sendRedirect"]
 
     def main(self, regex_string):
-        """函数名足够精确，不做额外筛选"""
+        if not isinstance(regex_string, str):
+            regex_string = str(regex_string)
+        # 排除有白名单校验的写法
+        if re.search(r"isUrlAllowed|ALLOWED_HOSTS|allowedHosts|whitelist|urlWhitelist|isValidRedirect", regex_string, re.I):
+            return False
         return None

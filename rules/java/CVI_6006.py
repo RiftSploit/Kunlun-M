@@ -48,6 +48,10 @@ class CVI_6006():
 
 
     def main(self, regex_string):
-        """openConnection/URL/RestTemplate 已足够精确，不需要额外筛选"""
+        if not isinstance(regex_string, str):
+            regex_string = str(regex_string)
+        # 排除有白名单校验的写法
+        if re.search(r"allowedHosts|ALLOWED_HOSTS|isUrlAllowed|whitelist|urlWhitelist|allowedDomains", regex_string, re.I):
+            return False
         return None
 

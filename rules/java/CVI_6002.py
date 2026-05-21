@@ -28,7 +28,7 @@ class CVI_6002():
 
         # 部分配置
         self.match_mode = "function-param-regex"
-        self.match = "print|write|println"
+        self.match = r"print|write|println|addObject|ModelAndView"
 
         # for solidity
         self.match_name = None
@@ -48,6 +48,13 @@ class CVI_6002():
 
 
     def main(self, regex_string):
-        """getWriter/getOutputStream/PrintWriter 已经是上下文限定的，不需要额外筛选"""
+        if not isinstance(regex_string, str):
+            regex_string = str(regex_string)
+        # 排除文件操作
+        if re.search(r"Files\.write|FileOutputStream|FileWriter|System\.out|System\.err", regex_string):
+            return False
+        # 排除经过转义的安全输出
+        if re.search(r"escapeHtml|htmlEscape|escapeHtml4|HtmlUtils|encode|sanitize", regex_string, re.I):
+            return False
         return None
 
