@@ -1,5 +1,11 @@
 ## 更新日志
 - 2026-05-22
+  - KunLun-M 2.9.2
+  - **依赖升级：javalang → ljavalang**
+    - 从 `javalang>=0.13.0` 切换为 `ljavalang>=2.0.2,<3`
+    - ljavalang 是 javalang 的增强 fork，修复链式调用 AST 解析 bug、支持 Java 9-22 新语法、零外部依赖
+    - 扫描测试验证：TestVulns.java 21 条检出、JavaVul base_vul 46 条（与旧 javalang 一致）、组件靶场全部正确命中
+- 2026-05-22
   - KunLun-M 2.9.1
   - **修复 Java 链式调用漏报**
     - javalang 解析器将链式方法调用（如 `Runtime.getRuntime().exec(cmd)`、`new ProcessBuilder(cmd).start()`）中的后续方法放入扁平的 `selectors` 列表，导致 sink 搜索和污点传播遗漏链式调用中的关键方法
