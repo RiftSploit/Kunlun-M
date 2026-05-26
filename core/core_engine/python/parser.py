@@ -525,9 +525,22 @@ def _trace_expr(param_name, expr, lineno, file_path,
                 result = parameters_back(an, [], lineno, file_path,
                                           repair_functions, controlled_params,
                                           visited_funcs, depth + 1)
-                if result and result[0] == 1:
+                if result and result[0] in (1, 2):
                     return result
-                if result and result[0] == 2:
+
+        # .format() 调用检查: "str".format(x) — x 可控则结果可控
+        if isinstance(expr.func, ast.Attribute) and expr.func.attr == 'format':
+            for arg in (expr.args or []):
+                result = _trace_expr(param_name, arg, lineno, file_path,
+                                      repair_functions, controlled_params,
+                                      visited_funcs, depth, tree)
+                if result and result[0] in (1, 2):
+                    return result
+            for kw in (expr.keywords or []):
+                result = _trace_expr(param_name, kw.value, lineno, file_path,
+                                      repair_functions, controlled_params,
+                                      visited_funcs, depth, tree)
+                if result and result[0] in (1, 2):
                     return result
 
         # 检查是否是修复函数调用
@@ -539,13 +552,20 @@ def _trace_expr(param_name, expr, lineno, file_path,
             func_def = _find_function_def(tree, call_name)
             if func_def and call_name not in visited_funcs:
                 logger.debug("[AST][Python] Entering function {} for tracing".format(call_name))
-                # 跟踪函数返回值
                 return _trace_function_return(func_def, expr, lineno, file_path,
                                                repair_functions, controlled_params,
                                                visited_funcs, depth, tree)
 
-    # 4. 如果是二元运算，追踪两边
+    # 4. 如果是二元运算，收集两边变量名并反向追踪
     if isinstance(expr, ast.BinOp):
+        names = _collect_names(expr)
+        for name in names:
+            result = parameters_back(name, [], lineno, file_path,
+                                      repair_functions, controlled_params,
+                                      visited_funcs, depth + 1)
+            if result and result[0] in (1, 2):
+                return result
+        # fallback: 递归检查子表达式
         result = _trace_expr(param_name, expr.left, lineno, file_path,
                               repair_functions, controlled_params,
                               visited_funcs, depth, tree)
@@ -567,7 +587,15 @@ def _trace_expr(param_name, expr, lineno, file_path,
                 if result and result[0] in (1, 2):
                     return result
 
-    # 6. 如果表达式包含变量名，继续反向追踪这些变量
+    # 6. Subscript: x[0], x[key] — 追踪基础对象
+    if isinstance(expr, ast.Subscript):
+        result = _trace_expr(param_name, expr.value, lineno, file_path,
+                              repair_functions, controlled_params,
+                              visited_funcs, depth, tree)
+        if result and result[0] in (1, 2):
+            return result
+
+    # 7. 如果表达式包含变量名，继续反向追踪这些变量
     names = _collect_names(expr)
     for name in names:
         result = parameters_back(name, [], lineno, file_path,
@@ -599,20 +627,64 @@ def _trace_function_return(func_def, call_node, lineno, file_path,
     func_args = func_def.args.args
     call_args = call_node.args or []
 
+    # 收集哪些形参对应的实参是可控的
+    controllable_param_names = set()
     for i, param in enumerate(func_args):
         if i < len(call_args):
-            arg_map[param.arg] = _expr_to_str(call_args[i])
+            arg_str = _expr_to_str(call_args[i])
+            arg_map[param.arg] = arg_str
+            # 检查实参是否可控（直接或通过变量追踪）
+            if is_controllable(arg_str, controlled_params):
+                controllable_param_names.add(param.arg)
+            else:
+                # 反向追踪实参中的变量
+                arg_names = _collect_names(call_args[i])
+                for an in arg_names:
+                    code, _ = parameters_back(an, [], lineno, file_path,
+                                              repair_functions, controlled_params,
+                                              visited_funcs, depth + 1)
+                    if code == 1:
+                        controllable_param_names.add(param.arg)
+                        break
+
+    # 在函数体内做赋值链传播：如果赋值右边包含可控形参，左边也标记可控
+    controllable_local = set(controllable_param_names)
+    for _ in range(3):  # 迭代传播
+        for stmt in func_def.body:
+            if isinstance(stmt, ast.Assign) and stmt.value:
+                for target in stmt.targets:
+                    tname = _get_name(target)
+                    if tname and tname not in controllable_local:
+                        rhs_names = _collect_names(stmt.value)
+                        if rhs_names & controllable_local:
+                            controllable_local.add(tname)
 
     # 在函数体中查找 return 语句
     for node in ast.walk(func_def):
         if isinstance(node, ast.Return) and node.value:
-            return_str = _expr_to_str(node.value)
+            return_names = _collect_names(node.value)
+            # 检查返回值是否包含任何可控变量
+            matched = return_names & controllable_local
+            if matched:
+                # 找到匹配的可控变量，获取其来源
+                for var_name in matched:
+                    if var_name in arg_map:
+                        src = arg_map[var_name]
+                        logger.debug("[AST][Python] Function {} returns controllable param {} (source: {})".format(
+                            func_name, var_name, src))
+                        return 1, src
+                    else:
+                        # 局部变量间接传播到 return
+                        logger.debug("[AST][Python] Function {} returns controllable local var {}".format(
+                            func_name, var_name))
+                        return 1, var_name
 
-            # 检查返回值是否包含可控参数
+            # fallback: 文本匹配
+            return_str = _expr_to_str(node.value)
             for param_name, arg_str in arg_map.items():
                 if is_controllable(arg_str, controlled_params):
                     if param_name in return_str or _contains_name(node.value, param_name):
-                        logger.debug("[AST][Python] Function {} returns controllable param {}".format(
+                        logger.debug("[AST][Python] Function {} returns controllable param {} (text match)".format(
                             func_name, param_name))
                         return 1, arg_str
 
@@ -686,12 +758,51 @@ def scan_parser(sensitive_func, vul_lineno, file_path, repair_functions=[], cont
 
             logger.debug("[AST][Python] Found sensitive call: {}() at line {}".format(call_name, target_line))
 
+            # ---- 赋值链迭代传播 ----
+            # 找到目标行所在的函数，在函数内做变量传播：
+            # 如果 x = tainted_var，则 x 也标记为可控
+            func_node = _find_function_at_line(tree, target_line)
+            extra_controlled = set()
+            if func_node:
+                # 收集函数体内所有赋值关系: {lhs: set_of_rhs_names}
+                assign_map = {}
+                for s in ast.walk(func_node):
+                    if isinstance(s, ast.Assign) and s.value:
+                        for t in s.targets:
+                            tname = _get_name(t)
+                            if tname:
+                                assign_map[tname] = _collect_names(s.value)
+
+                # 第一轮：用 parameters_back 标记 rhs 中可控的变量
+                for lhs_name, rhs_names in assign_map.items():
+                    for rn in rhs_names:
+                        code, _ = parameters_back(rn, [], target_line, file_path,
+                                                   repair_functions, controlled_params)
+                        if code == 1:
+                            extra_controlled.add(lhs_name)
+                            break
+
+                # 后续迭代传播：如果 rhs 包含已传播变量，lhs 也标记
+                changed = True
+                iterations = 0
+                while changed and iterations < 5:
+                    changed = False
+                    iterations += 1
+                    for lhs_name, rhs_names in assign_map.items():
+                        if lhs_name in extra_controlled:
+                            continue
+                        if rhs_names & extra_controlled:
+                            extra_controlled.add(lhs_name)
+                            changed = True
+
+            extended_controlled = list(controlled_params) + list(extra_controlled)
+
             # 分析每个参数
             for arg in (node.args or []):
                 arg_str = _expr_to_str(arg)
 
-                # 直接检查参数是否是可控源
-                if is_controllable(arg_str, controlled_params):
+                # 直接检查参数是否是可控源（含传播后的变量）
+                if is_controllable(arg_str, extended_controlled):
                     chain = ["{}:{}".format(target_line, source_lines[target_line - 1].strip() if target_line <= len(source_lines) else arg_str)]
                     scan_results.append({"code": 1, "chain": chain, "source": arg_str})
                     break
@@ -700,7 +811,7 @@ def scan_parser(sensitive_func, vul_lineno, file_path, repair_functions=[], cont
                 arg_names = _collect_names(arg)
                 for an in arg_names:
                     code, cp = parameters_back(an, [], target_line, file_path,
-                                                repair_functions, controlled_params)
+                                                repair_functions, extended_controlled)
 
                     chain = ["{}:{}".format(target_line, source_lines[target_line - 1].strip() if target_line <= len(source_lines) else arg_str)]
 
@@ -711,7 +822,53 @@ def scan_parser(sensitive_func, vul_lineno, file_path, repair_functions=[], cont
                         scan_results.append({"code": 2, "chain": chain, "source": cp})
                         break
                     elif code == 4:
-                        scan_results.append({"code": 4, "chain": chain, "source": cp})
+                        # code=4: 变量是函数参数，需要继续追踪
+                        # cp 是包含该参数的 FunctionDef 对象
+                        # 策略：检查该函数是否包含敏感函数调用（参数间接流入 sink）
+                        # 同时检查调用处的实参是否可控
+                        func_def = cp
+                        if isinstance(func_def, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                            # 检查函数体内是否有敏感调用
+                            has_sink = False
+                            for inner_node in ast.walk(func_def):
+                                if isinstance(inner_node, ast.Call):
+                                    inner_name = _get_call_name(inner_node)
+                                    if inner_name:
+                                        for sf in sensitive_func:
+                                            if inner_name == sf or inner_name.endswith('.' + sf):
+                                                has_sink = True
+                                                break
+                                    if has_sink:
+                                        break
+
+                            if has_sink:
+                                # 函数内有 sink，在整个文件中查找谁调用了这个函数
+                                for caller_node in ast.walk(tree):
+                                    if isinstance(caller_node, ast.Call):
+                                        cn = _get_call_name(caller_node)
+                                        if cn == func_def.name and hasattr(caller_node, 'lineno'):
+                                            # 找到调用点，检查实参
+                                            for caller_arg in (caller_node.args or []):
+                                                ca_str = _expr_to_str(caller_arg)
+                                                if is_controllable(ca_str, extended_controlled):
+                                                    scan_results.append({"code": 1, "chain": chain, "source": ca_str})
+                                                    break
+                                                # 反向追踪实参
+                                                ca_names = _collect_names(caller_arg)
+                                                for can in ca_names:
+                                                    ccode, ccp = parameters_back(can, [], caller_node.lineno, file_path,
+                                                                                  repair_functions, extended_controlled)
+                                                    if ccode == 1:
+                                                        scan_results.append({"code": 1, "chain": chain, "source": ccp})
+                                                        break
+                                                if scan_results:
+                                                    break
+                                            break  # 只处理第一个调用点
+                                if scan_results:
+                                    break
+
+                        if not scan_results:
+                            scan_results.append({"code": 4, "chain": chain, "source": arg_str})
                         break
                     elif code == 3:
                         scan_results.append({"code": 3, "chain": chain, "source": cp})
