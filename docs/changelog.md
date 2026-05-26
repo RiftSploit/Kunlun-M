@@ -1,4 +1,10 @@
 ## 更新日志
+- 2026-05-26
+  - KunLun-M 2.9.4
+  - **依赖升级：esprima → lesprima**
+    - 从 `esprima==4.0.1` 切换为 `lesprima>=2.0.0`
+    - lesprima 是 esprima-python 的增强 fork，支持 ES2018–ES2025 语法，修复 22 个上游 parser bug
+    - PyPI 包名为 `lesprima`，import 名仍为 `esprima`，代码无需改动
 - 2026-05-25
   - KunLun-M 2.9.3
   - **依赖升级：phply → lphply**

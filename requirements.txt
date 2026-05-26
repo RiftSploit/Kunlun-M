@@ -7,7 +7,7 @@ Werkzeug>=3.0.6
 
 # Parser / analysis stack
 lphply>=2.0.0
-esprima==4.0.1
+lesprima>=2.0.0
 pyjsparser>=2.7.1
 jsbeautifier>=1.15.1
 beautifulsoup4>=4.12.3
