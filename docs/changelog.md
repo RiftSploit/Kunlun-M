@@ -1,4 +1,22 @@
 ## 更新日志
+- 2026-05-27
+  - KunLun-M 2.10.0
+  - **三引擎统一 deps 机制：函数返回值追踪重构**
+    - 核心原则：函数体是封闭作用域，`function_back` 不再在函数体内调 `parameters_back`，消除循环递归风险
+    - 新机制：函数追踪只分析返回值依赖哪些形参，通过形参→实参映射返回 `('deps', [变量名列表])`，由外层继续向上回溯
+    - Python 引擎：`_trace_function_return` 返回 deps，`_trace_in_stmts` 收到后跳过当前赋值语句继续查找
+    - PHP 引擎：新增 `_analyze_return_deps()` + `_collect_var_names()`，保留 `scan_function_stack` 安全网
+    - JavaScript 引擎：新增 `_collect_js_var_names()`，保留 code=4 兼容路径，4 个调用点统一处理 deps
+  - **Python 扫描引擎增强**
+    - 新增 XPath 注入规则 CVI-7012（`lxml.etree.xpath`）
+    - 新增 `_expr_to_str` 链式调用展开（`a.b().c()` 不再截断）
+    - 新增 `_collect_names` Attribute 节点收集（`obj.prop` 同时收集完整名和基础变量名）
+    - `parameters_back` 加 `_trace_visited` 模块级去重集合防循环递归
+    - `_collect_names` 加 `_depth > 20` 深度限制防 AST 递归溢出
+    - `init_match_rule` 新增 Python 分支，修复 `test_class.py` TypeError
+    - grep 行号机制优化：每 10 行块内不再只取第一个匹配
+  - **Python 检出率提升**：benchmark 15 个漏洞点（原 10 个），base_case 检出率 78%，special_case 过滤函数场景突破
+  - **CI 验证**：#112-#115 全部通过
 - 2026-05-26
   - KunLun-M 2.9.5
   - **新增 Python 语言扫描支持**
