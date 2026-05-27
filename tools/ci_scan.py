@@ -131,6 +131,7 @@ def main(argv):
         from Kunlun_M.const import VUL_LEVEL, VENDOR_VUL_LEVEL
 
         target = args.target
+        target = os.path.abspath(target)  # 立即转绝对路径，防止扫描引擎改变 cwd 后失效
         started_at = time.time()
         rule_meta = _load_rule_meta()
 
@@ -241,41 +242,135 @@ def main(argv):
                 'source_code': sr.source_code,
             })
 
-        fail_rank = _severity_rank(args.fail_on)
+        # 检查 target 下是否存在 expected.json，优先使用对比逻辑
+        expected_path = os.path.join(target, 'expected.json') if os.path.isdir(target) else None
+        expected_data = None
+        if expected_path and os.path.isfile(expected_path):
+            try:
+                with open(expected_path, 'r', encoding='utf-8') as ef:
+                    expected_data = json.load(ef)
+            except Exception:
+                expected_data = None
+
         exit_code = 0
         reason = 'ok'
-        if max_rank >= fail_rank and fail_rank > 0 and len(vul_list) > 0:
-            exit_code = 2
-            reason = 'threshold_reached'
 
-        report = {
-            'meta': {
-                'target': target,
-                'task_id': s.id,
-                'project_id': project_id,
-                'started_at': s.started_at.isoformat() if s.started_at else None,
-                'finished_at': s.finished_at.isoformat() if s.finished_at else None,
-                'fail_on': args.fail_on,
-                'include_unconfirm': bool(args.include_unconfirm),
-                'with_vendor': bool(settings.WITH_VENDOR),
-                'settings_module': args.settings_module,
-            },
-            'summary': {
-                'total': len(vul_list),
-                'by_severity': counts,
-                'max_severity': max_sev,
-            },
-            'vulnerabilities': vul_list,
-            'exit': {
-                'code': exit_code,
-                'reason': reason,
+        if expected_data and isinstance(expected_data.get('expected'), list):
+            # 对比模式：实际结果 vs expected.json
+            expected_list = expected_data['expected']
+            # 提取实际检出中 file 的 basename 用于匹配（去掉 :行号 后缀）
+            actual_set = set()
+            for v in vul_list:
+                actual_file = os.path.basename(v.get('file', '')).split(':')[0]
+                actual_set.add((actual_file, str(v.get('cvi_id', ''))))
+
+            missing = []
+            for exp in expected_list:
+                exp_file = os.path.basename(exp.get('file', '')).split(':')[0]
+                exp_cvi = str(exp.get('cvi_id', ''))
+                if (exp_file, exp_cvi) not in actual_set:
+                    missing.append(exp)
+
+            unexpected = []
+            expected_set = set()
+            for exp in expected_list:
+                expected_set.add((os.path.basename(exp.get('file', '')).split(':')[0], str(exp.get('cvi_id', ''))))
+            for v in vul_list:
+                actual_file = os.path.basename(v.get('file', '')).split(':')[0]
+                actual_cvi = str(v.get('cvi_id', ''))
+                if (actual_file, actual_cvi) not in expected_set:
+                    unexpected.append(v)
+
+            if missing:
+                exit_code = 1
+                reason = 'expected_vulns_missing'
+
+            report = {
+                'meta': {
+                    'target': target,
+                    'task_id': s.id,
+                    'project_id': project_id,
+                    'started_at': s.started_at.isoformat() if s.started_at else None,
+                    'finished_at': s.finished_at.isoformat() if s.finished_at else None,
+                    'fail_on': args.fail_on,
+                    'include_unconfirm': bool(args.include_unconfirm),
+                    'with_vendor': bool(settings.WITH_VENDOR),
+                    'settings_module': args.settings_module,
+                    'mode': 'expected_comparison',
+                },
+                'summary': {
+                    'total': len(vul_list),
+                    'by_severity': counts,
+                    'max_severity': max_sev,
+                    'expected_count': len(expected_list),
+                    'missing_count': len(missing),
+                    'unexpected_count': len(unexpected),
+                },
+                'expected': expected_list,
+                'missing': missing,
+                'unexpected': unexpected,
+                'vulnerabilities': vul_list,
+                'exit': {
+                    'code': exit_code,
+                    'reason': reason,
+                }
             }
-        }
+        else:
+            # 后备模式：无 expected.json，使用旧的 --fail-on 阈值逻辑
+            fail_rank = _severity_rank(args.fail_on)
+            if max_rank >= fail_rank and fail_rank > 0 and len(vul_list) > 0:
+                exit_code = 2
+                reason = 'threshold_reached'
+
+            report = {
+                'meta': {
+                    'target': target,
+                    'task_id': s.id,
+                    'project_id': project_id,
+                    'started_at': s.started_at.isoformat() if s.started_at else None,
+                    'finished_at': s.finished_at.isoformat() if s.finished_at else None,
+                    'fail_on': args.fail_on,
+                    'include_unconfirm': bool(args.include_unconfirm),
+                    'with_vendor': bool(settings.WITH_VENDOR),
+                    'settings_module': args.settings_module,
+                    'mode': 'threshold',
+                },
+                'summary': {
+                    'total': len(vul_list),
+                    'by_severity': counts,
+                    'max_severity': max_sev,
+                },
+                'vulnerabilities': vul_list,
+                'exit': {
+                    'code': exit_code,
+                    'reason': reason,
+                }
+            }
 
         out = args.output
         _safe_makedirs(os.path.dirname(out))
         with open(out, 'w', encoding='utf-8') as f:
             json.dump(report, f, ensure_ascii=False, indent=2)
+
+        # 输出对比结果摘要
+        if expected_data and isinstance(expected_data.get('expected'), list):
+            print('[CI] 对比模式：共检出 {} 个漏洞，预期 {} 个'.format(len(vul_list), len(expected_data['expected'])))
+            if missing:
+                print('[CI] MISSING: 以下预期漏洞未被检出:')
+                for m in missing:
+                    print('  - {} (CVI-{})'.format(m.get('file', '?'), m.get('cvi_id', '?')))
+            else:
+                print('[CI] 所有预期漏洞均已检出')
+            if unexpected:
+                print('[CI] INFO: 预期之外的额外检出 (不阻塞):')
+                for u in unexpected:
+                    print('  - {} (CVI-{}) [{}]'.format(
+                        os.path.basename(u.get('file', '?')),
+                        u.get('cvi_id', '?'),
+                        u.get('severity', '?'),
+                    ))
+        else:
+            print('[CI] 阈值模式：共检出 {} 个漏洞，最高严重级别: {}'.format(len(vul_list), max_sev))
 
         return exit_code
     except SystemExit:

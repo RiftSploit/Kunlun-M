@@ -1,0 +1,9 @@
+{
+  "expected": [
+    {
+      "file": "sqli.php",
+      "cvi_id": "1005",
+      "severity": "high"
+    }
+  ]
+}

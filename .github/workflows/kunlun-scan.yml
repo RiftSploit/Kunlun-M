@@ -9,7 +9,6 @@ jobs:
   scan:
     runs-on: ubuntu-latest
     env:
-      KUNLUN_FAIL_ON: high
       KUNLUN_INCLUDE_UNCONFIRM: "0"
       KUNLUN_WITH_VENDOR: "0"
     steps:
@@ -22,7 +21,7 @@ jobs:
       - name: Install dependencies
         run: python -m pip install -r requirements.txt
       - name: Run KunLun CI scan
-        run: python tools/ci_scan.py --target ci_target --output artifacts/kunlun-ci.json --fail-on "${KUNLUN_FAIL_ON}"
+        run: python tools/ci_scan.py --target ci_target --output artifacts/kunlun-ci.json
       - name: Upload report artifact
         uses: actions/upload-artifact@v4
         with:
