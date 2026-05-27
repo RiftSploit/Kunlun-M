@@ -15,6 +15,7 @@
 # Match-Mode
 mm_function_param_controllable = 'function-param-regex'  # 函数正则匹配
 mm_java_function_param_controllable = 'java-function-param-regex'  # Java 专用：纯文本 grep + AST 污点分析
+mm_go_function_param_controllable = 'go-function-param-regex'     # Go 专用：Go AST 解析 + 污点追踪
 mm_regex_param_controllable = 'vustomize-match'  # 自定义匹配
 mm_regex_only_match = 'only-regex'
 mm_regex_return_regex = 'regex-return-regex'
@@ -28,6 +29,7 @@ match_modes = [
     mm_regex_param_controllable,
     mm_function_param_controllable,
     mm_java_function_param_controllable,
+    mm_go_function_param_controllable,
     mm_regex_return_regex,
     sp_crx_keyword_match,
     file_path_regex_match,
@@ -69,6 +71,7 @@ ext_dict = {
     "html": ['.html'],
     "python": ['.py'],
     "java": ['.java', '.jar', '.xml'],
+    "go": ['.go'],
     "base": ['*']
 }
 
@@ -76,6 +79,7 @@ ext_comment_dict = {
     "php": ['//', '/*'],
     "javascript": ['//', '/*'],
     "python": ['#'],
+    "go": ['//'],
 }
 
 default_black_list = ['.crx_files', 'vendor']

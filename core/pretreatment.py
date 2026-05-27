@@ -32,7 +32,7 @@ import asyncio
 import subprocess
 from collections.abc import Hashable
 
-could_ast_pase_lans = ["php", "chromeext", "javascript", "html", "java", "python"]
+could_ast_pase_lans = ["php", "chromeext", "javascript", "html", "java", "python", "go"]
 
 
 class Pretreatment:
@@ -62,13 +62,17 @@ class Pretreatment:
         if os.path.isfile(filepath):
             return os.path.normpath(filepath)
 
-        if os.path.isfile(os.path.normpath(os.path.join(self.target_directory, filepath))):
-            return os.path.normpath(os.path.join(self.target_directory, filepath))
+        # 去掉前导 /，避免 os.path.join 把它当绝对路径
+        clean_filepath = filepath.lstrip('/')
+
+        joined = os.path.normpath(os.path.join(self.target_directory, clean_filepath))
+        if os.path.isfile(joined):
+            return joined
 
         if os.path.isfile(self.target_directory):
             return os.path.normpath(self.target_directory)
         else:
-            return os.path.normpath(os.path.join(self.target_directory, filepath))
+            return joined
 
     def _normalize_define_key(self, key_node):
         """
@@ -613,6 +617,28 @@ class Pretreatment:
                     except SyntaxError as e:
                         logger.warning("[AST] [ERROR] parser {} SyntaxError: {}".format(filepath, str(e)))
                         continue
+
+                    except Exception:
+                        logger.warning("[AST] something error, {}".format(traceback.format_exc()))
+                        continue
+
+            elif fileext[0] in ext_dict["go"] and "go" in self.lan:
+                # 针对 Go 的预处理
+                # Go 没有 Python 端的 AST 解析器，将源码以文本形式存储，
+                # 后续由 core/core_engine/go/parser.py 做基于正则和行扫描的静态分析。
+                for filepath in fileext[1]["list"]:
+                    filepath = self.get_path(filepath)
+                    self.pre_result[filepath] = {}
+                    self.pre_result[filepath]["language"] = "go"
+                    self.pre_result[filepath]["ast_nodes"] = []
+
+                    try:
+                        fi = codecs.open(filepath, "r", encoding="utf-8", errors="ignore")
+                        code_content = fi.read()
+                        fi.close()
+
+                        # 存储源码行列表供 parser 使用
+                        self.pre_result[filepath]["source_lines"] = code_content.splitlines()
 
                     except Exception:
                         logger.warning("[AST] something error, {}".format(traceback.format_exc()))

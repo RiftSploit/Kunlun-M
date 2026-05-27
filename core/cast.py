@@ -18,6 +18,7 @@ import traceback
 from core.core_engine.php.parser import anlysis_params as php_anlysis_params
 from core.core_engine.javascript.parser import analysis_params as js_analysis_params
 from core.core_engine.python.parser import analysis_params as python_analysis_params
+from core.core_engine.go.parser import analysis_params as go_analysis_params
 
 from utils.file import File
 from utils.file import FileParseAll
@@ -30,7 +31,8 @@ class CAST(object):
                  'java': "java",
                  'sol': "sol",
                  'js': "javascript",
-                 'py': "python"}
+                 'py': "python",
+                 'go': "go"}
 
     def __init__(self, rule, target_directory, file_path, line, code, files=None, rule_class=None, repair_functions=[], controlled_params=[]):
         self.target_directory = target_directory
@@ -80,10 +82,16 @@ class CAST(object):
             },
             'javascript': {
                 'functions': r'(?:function\s+)(\w+)\s*\(',
-                'string': r"(?:['\"])(.*)(?:[\"'])",
+                'string': r"(?:['\"])(.*)(?:['\"])",
                 'assign_string': r"({0}\s?=\s?[\"'](.*)(?:['\"]))",
-                'annotation': r"(#|\\\*|\/\/|\*)+",
+                'annotation': r"(#|\\\*|\/\/|\*)+"
 
+            },
+            'go': {
+                'functions': r'func\s+(?:\(\w+\s+\*?\w+\)\s+)?(\w+)\s*\(',
+                'string': r'"([^"]*)"',
+                'assign_string': r'({0}\s*:?=\s*(.+))',
+                'annotation': r'(//|/\*|\*)+',
             }
         }
         logger.debug("[AST] [LANGUAGE] {language}".format(language=self.language))
@@ -320,6 +328,28 @@ class CAST(object):
                     _is_co, _cp, expr_lineno, chain = python_analysis_params(param_name, [],
                                                                              self.sr.vul_function, self.line, self.file_path,
                                                                              self.repair_functions, self.controlled_list, isexternal=True)
+
+                    if _is_co == 1:
+                        logger.debug("[AST] Is assign string: Yes")
+                        return True, _is_co, _cp, chain
+                    elif _is_co == 3:
+                        pass
+                    elif _is_co == 4:
+                        if hasattr(_cp[0], "name"):
+                            logger.info("[AST] New vul function {}()".format(_cp[0].name))
+                        else:
+                            logger.info("[AST] New vul function {}()".format(_cp[0]))
+                        return False, _is_co, tuple([_is_co, _cp]), chain
+                    else:
+                        continue
+
+                elif self.language == "go":
+                    logger.debug("[AST] Is variable: Yes")
+                    logger.debug("[Deep AST] Start AST for param {param_name}".format(param_name=param_name))
+
+                    _is_co, _cp, expr_lineno, chain = go_analysis_params(param_name, [],
+                                                                         self.sr.vul_function, self.line, self.file_path,
+                                                                         self.repair_functions, self.controlled_list, isexternal=True)
 
                     if _is_co == 1:
                         logger.debug("[AST] Is assign string: Yes")

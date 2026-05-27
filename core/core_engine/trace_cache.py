@@ -32,7 +32,7 @@ class TraceCache:
 
     def __init__(self, language):
         """
-        :param language: "python", "php", "javascript", "java"
+        :param language: "python", "php", "javascript", "java", "go"
         """
         self.language = language
         self._runtime_cache = {}  # key: (file_path, var_name, lineno) → value: (code, cp, expr_lineno)

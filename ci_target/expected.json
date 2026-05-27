@@ -4,6 +4,11 @@
       "file": "sqli.php",
       "cvi_id": "1005",
       "severity": "high"
+    },
+    {
+      "file": "cmd_inject.go",
+      "cvi_id": "8001",
+      "severity": "high"
     }
   ]
 }

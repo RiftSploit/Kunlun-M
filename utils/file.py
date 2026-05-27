@@ -271,7 +271,7 @@ class FileParseAll:
     def check_comment(self, content):
         backstr = ""
 
-        if self.language in ['php', 'javascript']:
+        if self.language in ['php', 'javascript', 'go']:
 
             lastchar = ""
             isinlinecomment = False
@@ -766,7 +766,7 @@ class Directory(object):
 
         self.type_nums.setdefault(file_extension.lower(), []).append(filename)
 
-        path = path.replace(self.absolute_path, '')
+        path = path.replace(self.absolute_path, '').lstrip('/')
         self.file.append(path)
         self.file_sum += 1
 
