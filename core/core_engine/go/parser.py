@@ -290,6 +290,49 @@ def _parse_func_call_from_expr(expr):
     return None
 
 
+# ---- 函数定义索引 ----
+# _func_def_index[(file_path, func_name)] = (formal_params, body_lines, def_lineno)
+# 在 scan_parser 入口构建，function_back_go 查表
+_func_def_index = {}
+_func_def_indexed_files = set()
+
+
+def _build_func_def_index(file_path):
+    """预扫描文件，索引所有 func 定义"""
+    if file_path in _func_def_indexed_files:
+        return
+    _func_def_indexed_files.add(file_path)
+
+    try:
+        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+            lines = f.readlines()
+    except Exception:
+        return
+
+    pat_func = re.compile(r'^func\s+(?:\([^)]+\)\s+)?(\w+)\s*\(')
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+        m = pat_func.match(stripped)
+        if m:
+            func_name = m.group(1)
+            # 避免重复索引（同名方法可能有 receiver 变体）
+            if (file_path, func_name) in _func_def_index:
+                continue
+            result = _find_function_def_in_lines(lines, func_name, from_line=i + 2)
+            if result is not None:
+                _func_def_index[(file_path, func_name)] = result
+
+
+def _build_func_def_index_cross_file():
+    """预扫描所有 Go 文件的函数定义（跨文件索引）"""
+    pt = _ast_object_singleton
+    if not pt or not hasattr(pt, 'pre_result'):
+        return
+    for other_fp, other_data in pt.pre_result.items():
+        if other_data.get('language') == 'go':
+            _build_func_def_index(other_fp)
+
+
 def _find_function_def_in_lines(lines, func_name, from_line=None):
     """
     在代码行列表中搜索 Go 函数定义。
@@ -427,16 +470,19 @@ def function_back_go(func_name, call_args, vul_lineno, file_path,
                 return (-1, [])
             # passthrough 已在 _trace_variable_in_lines 中处理
 
-        # 2. 在当前文件中搜索函数定义
-        try:
-            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                lines = f.readlines()
-        except Exception:
-            return (-1, [])
+        # 2. 查函数定义索引（预建）
+        result = _func_def_index.get((file_path, func_name))
 
-        result = _find_function_def_in_lines(lines, func_name, vul_lineno)
+        # 3. 索引未命中，回退到实时搜索
+        if result is None:
+            try:
+                with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    lines = f.readlines()
+            except Exception:
+                return (-1, [])
+            result = _find_function_def_in_lines(lines, func_name, vul_lineno)
 
-        # 3. 跨文件搜索
+        # 4. 跨文件搜索（查索引，未命中则实时搜索）
         if result is None:
             pt = _ast_object_singleton
             if pt and hasattr(pt, 'pre_result'):
@@ -445,6 +491,13 @@ def function_back_go(func_name, call_args, vul_lineno, file_path,
                         continue
                     if other_data.get('language') != 'go':
                         continue
+                    # 先查跨文件索引
+                    result = _func_def_index.get((other_fp, func_name))
+                    if result is not None:
+                        logger.debug("[AST][Go] Found function {} in cross-file index: {}".format(
+                            func_name, other_fp))
+                        break
+                    # 回退到实时搜索
                     other_lines = other_data.get('source_lines', [])
                     if not other_lines:
                         continue
@@ -990,6 +1043,10 @@ def scan_parser(rule_match, vul_lineno, file_path,
     if controlled_params is None:
         controlled_params = []
 
+    # ---- 预建函数定义索引（仅首次调用时构建） ----
+    _build_func_def_index(file_path)
+    _build_func_def_index_cross_file()
+
     results = []
 
     try:
@@ -1217,6 +1274,9 @@ def analysis_params(param_name, parent_func_names, vul_function, lineno, file_pa
         repair_functions = []
     if controlled_params is None:
         controlled_params = []
+
+    # ---- 预建函数定义索引 ----
+    _build_func_def_index(file_path)
 
     try:
         lineno = int(lineno)
