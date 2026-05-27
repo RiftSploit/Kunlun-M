@@ -1,5 +1,16 @@
 ## 更新日志
 - 2026-05-27
+  - KunLun-M 2.10.1
+  - **内置知识库拆分到各语言目录**
+    - 将单一 `builtin_knowledge.py` 拆分为四个语言独立文件
+    - `core/core_engine/python/builtin_knowledge.py` - Python + Django/Flask/SQLAlchemy 等
+    - `core/core_engine/php/builtin_knowledge.py` - PHP + Laravel/ThinkPHP/WordPress 等
+    - `core/core_engine/javascript/builtin_knowledge.py` - JS + Express/Vue/React 等
+    - `core/core_engine/java/builtin_knowledge.py` - Java + Spring/MyBatis 等
+    - `trace_cache.py` 改为动态加载，按语言自动导入对应知识库
+    - 各引擎 import 路径更新为语言独立模块
+  - **CI 验证**：#125 通过
+- 2026-05-27
   - KunLun-M 2.10.0
   - **三引擎统一 deps 机制：函数返回值追踪重构**
     - 核心原则：函数体是封闭作用域，`function_back` 不再在函数体内调 `parameters_back`，消除循环递归风险

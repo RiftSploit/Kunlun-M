@@ -18,6 +18,8 @@ import traceback
 
 from utils.log import logger
 from core.pretreatment import ast_object as _ast_object_singleton
+from core.core_engine.trace_cache import TraceCache
+from core.core_engine.python.builtin_knowledge import lookup as lookup_builtin
 
 # 全局状态（与 PHP/Java parser 保持一致的模式）
 scan_results = []
@@ -44,6 +46,9 @@ BUILTIN_SENSITIVE_SINKS = [
 # ---------------------------------------------------------------------------
 # 模块级追踪去重集合，防止 parameters_back 循环递归
 _trace_visited = set()
+
+# 追踪缓存 + 内置知识库
+_trace_cache = TraceCache("python")
 
 def _parse_imports(tree, file_path):
     """解析 AST 中的 import 语句，返回 {imported_name: module_file_path} 映射
@@ -384,6 +389,12 @@ def parameters_back(param_name, nodes, vul_lineno, file_path,
     if depth > 5:
         return -1, None
 
+    # 查缓存
+    if vul_lineno and file_path:
+        cached = _trace_cache.get(file_path, param_name, vul_lineno)
+        if cached is not None:
+            return cached
+
     tree = _ast_object_singleton.get_nodes(file_path)
     if not tree or not hasattr(tree, 'body'):
         return -1, None
@@ -398,14 +409,22 @@ def parameters_back(param_name, nodes, vul_lineno, file_path,
 
     if func_node:
         # 在函数内追踪
-        return _trace_in_function(param_name, func_node, int(vul_lineno),
+        result = _trace_in_function(param_name, func_node, int(vul_lineno),
                                    file_path, repair_functions, controlled_params,
                                    visited_funcs, depth, tree)
     else:
         # 模块级别追踪
-        return _trace_in_stmts(param_name, relevant_stmts, int(vul_lineno),
+        result = _trace_in_stmts(param_name, relevant_stmts, int(vul_lineno),
                                 file_path, repair_functions, controlled_params,
                                 visited_funcs, depth, tree)
+
+    # 写入缓存（只缓存确定性结果，跳过中间状态）
+    if vul_lineno and file_path and result is not None:
+        code = result[0] if not isinstance(result[0], str) else -1
+        if code in (-1, 1, 2):
+            _trace_cache.put(file_path, param_name, int(vul_lineno), result)
+
+    return result
 
 
 def _find_function_at_line(tree, target_line):
@@ -939,6 +958,35 @@ def _trace_function_return(func_def, call_node, lineno, file_path,
     """
     func_name = func_def.name
 
+    # 查内置知识库（优先级高于函数体分析）
+    call_func_name = None
+    if hasattr(call_node.func, 'id'):
+        call_func_name = call_node.func.id
+    elif hasattr(call_node.func, 'attr'):
+        call_func_name = call_node.func.attr
+        # 补全模块前缀，如 os.path.join
+        if hasattr(call_node.func, 'value'):
+            val = call_node.func.value
+            if hasattr(val, 'id'):
+                call_func_name = val.id + '.' + call_func_name
+            elif hasattr(val, 'attr'):
+                call_func_name = val.attr + '.' + call_func_name
+
+    if call_func_name:
+        knowledge = lookup_builtin(call_func_name)
+        if knowledge:
+            if knowledge["safe"] and not knowledge["passthrough"]:
+                return -1, None
+            if knowledge["passthrough"]:
+                deps = set()
+                for arg_idx in knowledge["passthrough"]:
+                    if arg_idx < len(call_node.args or []):
+                        arg_names = _collect_names(call_node.args[arg_idx])
+                        deps.update(arg_names)
+                if deps:
+                    return ('deps', list(deps), getattr(call_node, 'lineno', lineno))
+            return -1, None  # 不透传 → 安全
+
     # 建立参数映射：调用实参 → 函数形参
     arg_map = {}
     func_args = func_def.args.args
@@ -1170,8 +1218,9 @@ def scan_parser(sensitive_func, vul_lineno, file_path, repair_functions=[], cont
     """
     global scan_results, is_repair_functions, is_controlled_params, scan_chain, _trace_visited
 
-    # 清空追踪去重集合
+    # 清空追踪去重集合和缓存
     _trace_visited = set()
+    _trace_cache.clear()
 
     try:
         scan_chain = ["start"]

@@ -16,6 +16,8 @@ from utils.log import logger
 from core.pretreatment import ast_object
 
 from core.internal_defines.javascript.functions import function_dict, string_function
+from core.core_engine.trace_cache import TraceCache
+from core.core_engine.javascript.builtin_knowledge import lookup as lookup_builtin
 
 default_controlled_params = [
     'location.hash',
@@ -53,6 +55,8 @@ scan_results = []  # 结果存放列表初始化
 is_repair_functions = []  # 修复函数初始化
 is_controlled_params = []
 scan_chain = []  # 回溯链变量
+
+_trace_cache = TraceCache("javascript")
 
 
 def get_member_data(node, check=False, isparam=False, isclean_prototype=False, isreverse=False):
@@ -448,6 +452,23 @@ def function_back(function_node, function_params, back_nodes=None, file_path=Non
     expr_lineno = 0
 
     logger.debug("[AST] Sounds like found a new function define {}".format(function_name))
+
+    # 查内置知识库
+    knowledge = lookup_builtin(function_name)
+    if knowledge:
+        if knowledge["safe"] and not knowledge["passthrough"]:
+            return -1, "Function()", 0
+        if knowledge["passthrough"]:
+            # function_back 接收的是函数定义节点，不知道调用处实参
+            # 返回形参名让外层映射
+            formal_params = [get_member_data(p) for p in function_params]
+            deps_formal = []
+            for idx in knowledge["passthrough"]:
+                if idx < len(formal_params):
+                    deps_formal.append(formal_params[idx])
+            if deps_formal:
+                return ('deps', deps_formal, function_lineno)
+        return -1, "Function()", 0
 
     # 寻找函数体中的 ReturnStatement
     return_node = None
@@ -856,6 +877,27 @@ def function_call_back(param, nodes, function_params, file_path=None, isback=Fal
     else:
         # 处理当参数传递到function call时，需要回溯寻找函数定义
 
+        # 先查内置知识库，用 callee_name 匹配
+        knowledge = lookup_builtin(callee_name)
+        if knowledge:
+            if knowledge["safe"] and not knowledge["passthrough"]:
+                logger.debug("[AST] callee {} in builtin knowledge, safe=True, skip".format(callee_name))
+                return -1, param, expr_lineno
+            if knowledge["passthrough"]:
+                logger.debug("[AST] callee {} in builtin knowledge, passthrough={}, mapping args".format(
+                    callee_name, knowledge["passthrough"]))
+                callee_params = param.arguments
+                for arg_idx in knowledge["passthrough"]:
+                    if callee_params and arg_idx < len(callee_params):
+                        arg = callee_params[arg_idx]
+                        is_co2, cp2, expr_lineno2 = parameters_back(arg, nodes, function_params, lineno,
+                                                                     function_flag=0, vul_function=vul_function,
+                                                                     file_path=file_path,
+                                                                     isback=True, method_name=method_name)
+                        if is_co2 == 1:
+                            return is_co2, cp2, expr_lineno2
+                return 3, param, expr_lineno
+
         for node in nodes[::-1]:
             if node.type == "FunctionDeclaration" and get_member_data(node.id) == callee_name:
 
@@ -941,6 +983,13 @@ def parameters_back(param, nodes, function_params=None, lineno=0,
     :return:
     """
     global scan_chain
+
+    # 查缓存
+    param_name = get_member_data(param)
+    if param_name and lineno and file_path:
+        cached = _trace_cache.get(file_path, param_name, int(lineno))
+        if cached is not None:
+            return cached
 
     expr_lineno = 0  # source所在行号
     is_co, cp = is_controllable(param)
@@ -1504,6 +1553,11 @@ def deep_parameters_back(param, back_node, function_params, count, file_path, li
     is_co, cp, expr_lineno = parameters_back(param, back_node, function_params, lineno, vul_function=vul_function,
                                              file_path=file_path, isback=isback)
 
+    # 缓存确定性结果（只缓存确定性结果，跳过中间状态）
+    if lineno and file_path and isinstance(is_co, int) and is_co in (-1, 1, 2):
+        param_str = get_member_data(param) if hasattr(param, 'type') else str(param)
+        _trace_cache.put(file_path, param_str, int(lineno), (is_co, cp, expr_lineno))
+
     if count > 20:
         logger.warning("[Deep AST] depth too big, auto exit...")
         return is_co, cp, expr_lineno
@@ -1795,6 +1849,7 @@ def scan_parser(sensitive_func, vul_lineno, file_path, repair_functions=[], cont
     try:
         global scan_results, is_repair_functions, is_controlled_params, scan_chain
 
+        _trace_cache.clear()
         scan_chain = ['start']
         scan_results = []
         is_repair_functions = repair_functions

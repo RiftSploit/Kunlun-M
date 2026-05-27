@@ -24,6 +24,7 @@ from utils.status import SCAN_ID
 from core.pretreatment import ast_object
 from core.internal_defines.php.functions import function_dict as php_function_dict
 from core.internal_defines.php.class_functions import function_dict as php_magic_function_dict
+from core.core_engine.trace_cache import TraceCache
 
 # lphply >= 2.0.0 新增的等价节点类型（字段与原类型完全一致）
 _METHOD_CALL_TYPES = (php.MethodCall, getattr(php, 'NullsafeMethodCall', php.MethodCall))
@@ -39,6 +40,7 @@ is_repair_functions = []  # 修复函数初始化
 is_controlled_params = []
 scan_chain = []  # 回溯链变量
 scan_function_stack = []  # 函数回溯栈，用于避免 A->B->A 这类互相递归导致的无限回溯
+_trace_cache = TraceCache("php")
 all_nodes = []
 BASE_FUNCTIONCALL_LIST = ['FunctionCall', 'MethodCall', 'StaticMethodCall', 'ObjectProperty', 'NullsafeMethodCall', 'NullsafeProperty']
 SPECIAL_FUNCTIONCALL_LIST = ['Eval', 'Echo', 'Print', 'Return', 'Break', 'Include',
@@ -626,6 +628,32 @@ def function_back(param, nodes, function_params, vul_function=None, file_path=No
     scan_function_stack.append(function_name)
 
     try:
+        # ---- 查内置知识库 ----
+        knowledge = _trace_cache.lookup_builtin(function_name)
+        if knowledge:
+            if knowledge.get("safe") and not knowledge.get("passthrough"):
+                logger.debug("[AST][PHP] Builtin knowledge: {} is safe, skip analysis".format(function_name))
+                return -1, param, 0
+            passthrough = knowledge.get("passthrough", [])
+            if passthrough:
+                # 从 param.params（实参列表）中提取对应位置的变量名
+                deps = []
+                actual_params = param.params if hasattr(param, 'params') else []
+                for arg_idx in passthrough:
+                    if actual_params and arg_idx < len(actual_params):
+                        arg = actual_params[arg_idx]
+                        if hasattr(arg, 'node'):
+                            arg_name = get_node_name(arg.node)
+                        else:
+                            arg_name = get_node_name(arg) if hasattr(arg, '__class__') else str(arg)
+                        if arg_name:
+                            deps.append(arg_name)
+                if deps:
+                    logger.debug("[AST][PHP] Builtin knowledge: {} passthrough → deps: {}".format(function_name, deps))
+                    return 'deps', deps, getattr(param, 'lineno', 0)
+            # 知识库有记录但没有 passthrough 且 safe=False → 不透传不可控
+            return -1, param, 0
+
         for node in nodes[::-1]:
             # ---- 普通函数 ----
             if isinstance(node, php.Function):
@@ -968,6 +996,38 @@ def new_class_back(param, nodes, vul_function=None, file_path=None, isback=None)
 
 
 def parameters_back(param, nodes, function_params=None, lineno=0,
+                    function_flag=0, vul_function=None, file_path=None,
+                    isback=None, parent_node=None):
+    """
+    parameters_back 入口（带运行时缓存）。
+    缓存查询命中则直接返回；否则调用 _parameters_back_impl，并在确定性结果时写入缓存。
+    """
+    # 计算 cache key
+    if hasattr(param, "name"):
+        _pname = get_node_name(param)
+    else:
+        _pname = param
+
+    # 查缓存
+    if lineno and file_path:
+        cached = _trace_cache.get(file_path, str(_pname), int(lineno))
+        if cached is not None:
+            return cached
+
+    # 调用实际实现
+    result = _parameters_back_impl(param, nodes, function_params, lineno,
+                                    function_flag, vul_function, file_path,
+                                    isback, parent_node)
+    is_co = result[0]
+
+    # 写入缓存：仅缓存确定性结果（-1=不可控, 1=可控, 2=已修复）
+    if lineno and file_path and is_co in (-1, 1, 2):
+        _trace_cache.put(file_path, str(_pname), int(lineno), result)
+
+    return result
+
+
+def _parameters_back_impl(param, nodes, function_params=None, lineno=0,
                     function_flag=0, vul_function=None, file_path=None,
                     isback=None, parent_node=None):  # 用来得到回溯过程中的被赋值的变量是否与敏感函数变量相等,param是当前需要跟踪的污点
     """
@@ -2813,6 +2873,7 @@ def scan_parser(sensitive_func, vul_lineno, file_path, repair_functions=[], cont
         scan_results = []
         is_repair_functions = repair_functions
         is_controlled_params = controlled_params
+        _trace_cache.clear()
         all_nodes = ast_object.get_nodes(file_path)
 
         for func in sensitive_func:  # 循环判断代码中是否存在敏感函数，若存在，递归判断参数是否可控;对文件内容循环判断多次

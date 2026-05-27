@@ -5,11 +5,16 @@ import traceback
 import javalang
 from utils.log import logger
 from core.pretreatment import ast_object as _ast_object_singleton
+from core.core_engine.trace_cache import TraceCache
+from core.core_engine.java.builtin_knowledge import lookup as lookup_builtin
 
 scan_results = []
 is_repair_functions = []
 is_controlled_params = []
 scan_chain = []
+
+# 追踪缓存 + 内置知识库
+_trace_cache = TraceCache("java")
 
 
 def _expr_to_text(expr, source_lines):
@@ -425,6 +430,17 @@ def _is_passthrough_method(method_node, param_name, repair_functions, class_meth
     if depth >= max_depth or not method_node or not method_node.body:
         return False
 
+    # 查内置知识库：已知方法直接返回透传结果
+    method_name = getattr(method_node, 'name', None)
+    if method_name:
+        knowledge = lookup_builtin(method_name)
+        if knowledge:
+            if knowledge["safe"] and not knowledge["passthrough"]:
+                return False  # 安全过滤函数，不透传
+            if knowledge["passthrough"]:
+                return True  # 透传参数
+            return False  # 不透传
+
     for stmt in method_node.body:
         if isinstance(stmt, javalang.tree.ReturnStatement) and stmt.expression:
             expr = stmt.expression
@@ -578,6 +594,12 @@ def _check_caller_controllability(current_method, ast_obj, repair_functions, glo
     if depth >= max_depth:
         return controllable_params
     
+    # 查缓存
+    method_key = current_method.name
+    cached = _trace_cache.get("__java_caller__", method_key, depth)
+    if cached is not None:
+        return cached
+    
     if ast_obj is None or not hasattr(ast_obj, 'pre_result'):
         return controllable_params
     
@@ -669,9 +691,15 @@ def _check_caller_controllability(current_method, ast_obj, repair_functions, glo
                                     logger.debug("[AST][Java] Reverse cross-file (depth={}): param '{}' of {}() is controllable (called from {}:{})".format(
                                         depth, param.name, current_method_name, filepath,
                                         caller_method.position.line if caller_method.position else '?'))
+                                # 写入缓存后提前返回
+                                _trace_cache.put("__java_caller__", current_method.name, depth, controllable_params)
                                 return controllable_params  # 已找到可控来源，提前返回
         except Exception:
             continue
+    
+    # 写入缓存
+    if controllable_params:
+        _trace_cache.put("__java_caller__", current_method.name, depth, controllable_params)
     
     return controllable_params
 
@@ -1035,6 +1063,9 @@ def scan_parser(sensitive_func, vul_lineno, file_path, repair_functions=[], cont
     :return: scan_results 列表，每个元素是 {"code": N, "chain": [...], ...}
     """
     global scan_results, is_repair_functions, is_controlled_params, scan_chain
+
+    # 清空缓存
+    _trace_cache.clear()
 
     try:
         scan_chain = ["start"]
