@@ -288,6 +288,10 @@ def _expr_to_str(node):
         base = _expr_to_str(node.value)
         return '{}.{}'.format(base, node.attr) if base else node.attr
     if isinstance(node, ast.Call):
+        # 递归展开链式调用：request.body.decode(...).encode(...) → request.body.decode(...).encode(...)
+        func = node.func
+        if isinstance(func, ast.Attribute) and isinstance(func.value, ast.Call):
+            return '{}.{}(...)'.format(_expr_to_str(func.value), func.attr)
         return '{}(...)'.format(_get_call_name(node) or '...')
     if isinstance(node, ast.BinOp):
         return '{} + {}'.format(_expr_to_str(node.left), _expr_to_str(node.right))
