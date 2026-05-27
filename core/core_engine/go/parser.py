@@ -632,6 +632,38 @@ def _trace_variable_in_lines(file_path, var_name, from_line, to_line,
                               repair_functions=None, controlled_params=None,
                               depth=0, max_depth=5):
     """
+    在指定行范围内追踪变量的数据流（缓存包装层）
+
+    入口查缓存，出口写缓存（仅缓存 depth=0 的顶层调用）。
+    实际逻辑在 _trace_variable_in_lines_impl 中。
+    """
+    if repair_functions is None:
+        repair_functions = is_repair_functions
+    if controlled_params is None:
+        controlled_params = is_controlled_params
+
+    # 顶层调用才查/写缓存
+    if depth == 0 and file_path and to_line:
+        cached = _trace_cache.get(file_path, var_name, int(to_line))
+        if cached is not None:
+            return cached[0]
+
+    result = _trace_variable_in_lines_impl(
+        file_path, var_name, from_line, to_line,
+        repair_functions, controlled_params, depth, max_depth
+    )
+
+    # 顶层调用写缓存（仅确定性结果）
+    if depth == 0 and file_path and to_line and result in (1, 2, -1):
+        _trace_cache.put(file_path, var_name, int(to_line), (result, [], to_line))
+
+    return result
+
+
+def _trace_variable_in_lines_impl(file_path, var_name, from_line, to_line,
+                                   repair_functions, controlled_params,
+                                   depth, max_depth):
+    """
     在指定行范围内追踪变量的数据流
 
     从 from_line 向上扫描到 to_line，查找 var_name 的赋值和来源。
