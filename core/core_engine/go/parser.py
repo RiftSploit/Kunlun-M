@@ -22,6 +22,18 @@ from core.pretreatment import ast_object as _ast_object_singleton
 from core.core_engine.trace_cache import TraceCache
 from core.core_engine.go.builtin_knowledge import lookup as lookup_builtin
 
+# tree-sitter Go AST 解析
+try:
+    import tree_sitter_go as _tsgo
+    from tree_sitter import Language as _TS_Language, Parser as _TS_Parser
+    _GO_TS_LANGUAGE = _TS_Language(_tsgo.language())
+    _ts_parser = _TS_Parser(_GO_TS_LANGUAGE)
+    _HAS_TREE_SITTER = True
+except ImportError:
+    _HAS_TREE_SITTER = False
+    _ts_parser = None
+    _GO_TS_LANGUAGE = None
+
 scan_results = []
 is_repair_functions = []
 is_controlled_params = []
@@ -152,6 +164,401 @@ def _go_line_to_text(file_path, lineno):
     except Exception:
         pass
     return ""
+
+
+# ---- tree-sitter AST 辅助函数 ----
+
+_ast_cache = {}  # file_path → tree
+
+
+def _parse_go_ast(file_path):
+    """用 tree-sitter 解析 Go 文件，返回 AST tree（带缓存）"""
+    if not _HAS_TREE_SITTER:
+        return None
+    if file_path in _ast_cache:
+        return _ast_cache[file_path]
+    try:
+        with open(file_path, 'rb') as f:
+            source = f.read()
+        tree = _ts_parser.parse(source)
+        _ast_cache[file_path] = tree
+        return tree
+    except Exception:
+        return None
+
+
+def _find_call_at_line(tree, lineno, func_name):
+    """
+    在 AST 中查找指定行号上的 call_expression 节点。
+    匹配 func_name（支持 db.Query、exec.Command 等完整名称）。
+    """
+    if tree is None:
+        return None
+
+    # func_name 的短名称（如 exec.Command → Command）
+    short_name = func_name.split('.')[-1]
+
+    def _search(node):
+        if node.type == 'call_expression':
+            node_line = node.start_point[0] + 1  # tree-sitter 0-indexed
+            if node_line == lineno:
+                # 检查函数名是否匹配
+                func_text = _get_call_func_text(node)
+                if func_name in func_text or short_name in func_text:
+                    return node
+                # 检查内层嵌套调用（如 exec.Command(...).Output()）
+                for child in node.children:
+                    if child.type == 'call_expression':
+                        inner = _search(child)
+                        if inner:
+                            return inner
+        for child in node.children:
+            result = _search(child)
+            if result:
+                return result
+        return None
+
+    return _search(tree.root_node)
+
+
+def _get_call_func_text(call_node):
+    """获取 call_expression 的函数名文本"""
+    if call_node.children:
+        return call_node.children[0].text.decode('utf-8', errors='ignore')
+    return ''
+
+
+def _get_call_args_from_ast(call_node):
+    """
+    从 call_expression 节点提取参数列表。
+    返回 AST 节点列表（不含括号和逗号）。
+    """
+    for child in call_node.children:
+        if child.type == 'argument_list':
+            args = []
+            for arg_child in child.children:
+                if arg_child.type not in ('(', ')', ','):
+                    args.append(arg_child)
+            return args
+    return []
+
+
+def _collect_identifiers_from_ast(node):
+    """
+    从 AST 节点中递归收集所有 identifier（变量名）。
+    排除包名（qualified_type 中的 package_identifier）和类型名。
+    """
+    identifiers = []
+
+    def _walk(n):
+        if n.type == 'identifier':
+            name = n.text.decode('utf-8', errors='ignore')
+            # 排除 Go 关键字和内置常量
+            if name not in ('true', 'false', 'nil', 'int', 'string', 'bool',
+                            'float32', 'float64', 'byte', 'rune', 'error',
+                            'len', 'cap', 'make', 'new', 'append', 'copy',
+                            'delete', 'panic', 'recover', 'print', 'println',
+                            'complex', 'real', 'imag', 'close', 'iota',
+                            'new', 'defer', 'go', 'select', 'case', 'default',
+                            'func', 'return', 'if', 'else', 'for', 'range',
+                            'switch', 'type', 'struct', 'interface', 'map',
+                            'chan', 'package', 'import', 'const', 'var'):
+                identifiers.append(name)
+        elif n.type == 'selector_expression':
+            # a.b → 收集基础变量 a（不收集 .b 因为它是属性/方法名）
+            if n.children and n.children[0].type == 'identifier':
+                base_name = n.children[0].text.decode('utf-8', errors='ignore')
+                identifiers.append(base_name)
+            # 也收集完整表达式文本（如 r.URL.Query）
+            full_text = n.text.decode('utf-8', errors='ignore')
+            if full_text not in identifiers:
+                pass  # 不收集完整链式表达式，只收集基础变量
+            # 递归处理子节点（可能包含 call_expression）
+            for child in n.children:
+                _walk(child)
+        elif n.type == 'call_expression':
+            # 函数调用：只收集参数中的标识符，不收集函数名本身
+            for child in n.children:
+                if child.type == 'argument_list':
+                    for arg_child in child.children:
+                        _walk(arg_child)
+        else:
+            for child in n.children:
+                _walk(child)
+
+    _walk(node)
+    # 去重保持顺序
+    seen = set()
+    unique = []
+    for name in identifiers:
+        if name not in seen:
+            seen.add(name)
+            unique.append(name)
+    return unique
+
+
+# ---- AST-based 赋值分析辅助函数 ----
+
+_LITERAL_NODE_TYPES = frozenset([
+    'interpreted_string_literal', 'raw_string_literal',
+    'int_literal', 'float_literal',
+    'true', 'false', 'nil',
+    'composite_literal',  # struct/map/slice literals
+    'rune_literal',
+])
+
+
+def _is_literal_node(node):
+    """检查 AST 节点是否是字面量"""
+    if node.type in _LITERAL_NODE_TYPES:
+        return True
+    # int/float with sign prefix: - 作为 unary_expression 也算
+    if node.type == 'unary_expression' and node.children:
+        op = node.children[0].text.decode('utf-8', errors='ignore') if node.children else ''
+        if op in ('-', '+') and len(node.children) >= 2:
+            return _is_literal_node(node.children[-1])
+    return False
+
+
+def _get_node_identifier(node):
+    """从 AST 节点提取标识符文本（处理 selector_expression）"""
+    if node.type == 'identifier':
+        return node.text.decode('utf-8', errors='ignore')
+    if node.type == 'selector_expression':
+        return node.text.decode('utf-8', errors='ignore')
+    if node.type == 'field_identifier':
+        return node.text.decode('utf-8', errors='ignore')
+    return None
+
+
+def _find_assignment_rhs_at_line(tree, lineno, var_name):
+    """
+    在 AST 中查找指定行上 var_name 的赋值 RHS 节点。
+    支持：
+      - short_var_declaration (a := expr)
+      - assignment_statement (a = expr)
+      - var_declaration (var a Type = expr)
+    返回 RHS expression_list 节点或 None。
+    """
+    if tree is None:
+        return None
+
+    result = [None]
+
+    def _search(node):
+        if result[0] is not None:
+            return
+        # 检查行范围：节点必须在目标行上
+        node_line = node.start_point[0] + 1
+        if node_line > lineno:
+            return  # 超过目标行，剪枝
+
+        if node.type == 'short_var_declaration':
+            if node_line == lineno:
+                # 结构: expression_list (LHS) := expression_list (RHS)
+                lhs_list = None
+                rhs_list = None
+                for child in node.children:
+                    if child.type == 'expression_list':
+                        if lhs_list is None:
+                            lhs_list = child
+                        else:
+                            rhs_list = child
+                if lhs_list and rhs_list:
+                    # 检查 LHS 是否包含 var_name
+                    for lhs_child in lhs_list.children:
+                        if lhs_child.type == 'identifier':
+                            name = lhs_child.text.decode('utf-8', errors='ignore')
+                            if name == var_name:
+                                # RHS 的 expression_list 中取第一个表达式
+                                if rhs_list.children:
+                                    # 取 expression_list 的第一个非逗号子节点
+                                    for rc in rhs_list.children:
+                                        if rc.type != ',':
+                                            result[0] = rc
+                                            return
+                                result[0] = rhs_list
+                                return
+
+        elif node.type == 'assignment_statement':
+            if node_line == lineno:
+                lhs_list = None
+                rhs_list = None
+                for child in node.children:
+                    if child.type == 'expression_list':
+                        if lhs_list is None:
+                            lhs_list = child
+                        else:
+                            rhs_list = child
+                if lhs_list and rhs_list:
+                    for lhs_child in lhs_list.children:
+                        if lhs_child.type == 'identifier':
+                            name = lhs_child.text.decode('utf-8', errors='ignore')
+                            if name == var_name:
+                                if rhs_list.children:
+                                    for rc in rhs_list.children:
+                                        if rc.type != ',':
+                                            result[0] = rc
+                                            return
+                                result[0] = rhs_list
+                                return
+
+        elif node.type == 'var_declaration':
+            if node_line == lineno:
+                # var a Type = expr  →  var_spec 内部
+                for child in node.children:
+                    if child.type == 'var_spec':
+                        # var_spec: name type = value
+                        name_node = None
+                        value_list = None
+                        for sc in child.children:
+                            if sc.type == 'identifier':
+                                name_node = sc
+                            elif sc.type == 'expression_list':
+                                value_list = sc
+                        if name_node:
+                            name = name_node.text.decode('utf-8', errors='ignore')
+                            if name == var_name and value_list:
+                                if value_list.children:
+                                    for vc in value_list.children:
+                                        if vc.type != ',':
+                                            result[0] = vc
+                                            return
+                                result[0] = value_list
+                                return
+
+        # 继续递归子节点
+        for child in node.children:
+            _search(child)
+            if result[0] is not None:
+                return
+
+    _search(tree.root_node)
+    return result[0]
+
+
+def _get_call_expr_from_node(node):
+    """
+    从节点中查找第一个 call_expression。
+    用于处理 expression_list 包裹的情况。
+    """
+    if node.type == 'call_expression':
+        return node
+    for child in node.children:
+        result = _get_call_expr_from_node(child)
+        if result:
+            return result
+    return None
+
+
+def _find_enclosing_function(tree, lineno):
+    """
+    在 AST 中查找包含指定行的函数定义。
+    返回函数的 parameter_list 节点和函数名，或 None。
+    """
+    if tree is None:
+        return None
+
+    result = [None]
+
+    def _search(node):
+        if result[0] is not None:
+            return
+        if node.type in ('function_declaration', 'method_declaration'):
+            start_line = node.start_point[0] + 1
+            end_line = node.end_point[0] + 1
+            if start_line <= lineno <= end_line:
+                func_name = None
+                params = None
+                for child in node.children:
+                    if child.type == 'identifier':
+                        func_name = child.text.decode('utf-8', errors='ignore')
+                    elif child.type == 'parameter_list' and params is None:
+                        params = child
+                    elif child.type == 'field_identifier':
+                        func_name = child.text.decode('utf-8', errors='ignore')
+                result[0] = (func_name, params, start_line, end_line)
+                return
+        for child in node.children:
+            _search(child)
+
+    _search(tree.root_node)
+    return result[0]
+
+
+def _get_formal_param_names(param_list_node):
+    """从 parameter_list AST 节点提取形参名列表"""
+    if param_list_node is None:
+        return []
+    names = []
+    for child in param_list_node.children:
+        if child.type == 'parameter_declaration':
+            for sc in child.children:
+                if sc.type == 'identifier':
+                    names.append(sc.text.decode('utf-8', errors='ignore'))
+                    break
+    return names
+
+
+def _find_return_nodes(tree, start_line, end_line):
+    """
+    在 AST 中查找指定行范围内的 return_statement 节点列表。
+    """
+    if tree is None:
+        return []
+
+    returns = []
+
+    def _search(node):
+        node_line = node.start_point[0] + 1
+        if node_line > end_line:
+            return
+        if node.type == 'return_statement':
+            if start_line <= node_line <= end_line:
+                returns.append(node)
+        for child in node.children:
+            _search(child)
+
+    _search(tree.root_node)
+    return returns
+
+
+def _extract_args_with_nesting(text, func_name):
+    """从代码行中提取函数调用的完整参数字符串，支持嵌套括号（回退方案）"""
+    idx = text.find(func_name + '(')
+    if idx < 0:
+        short_name = func_name.split('.')[-1]
+        idx = text.find(short_name + '(')
+        if idx < 0:
+            return None
+        idx += len(short_name)
+    else:
+        idx += len(func_name)
+    if idx >= len(text) or text[idx] != '(':
+        return None
+    depth = 0
+    in_string = False
+    string_char = None
+    start = idx + 1
+    for i in range(idx, len(text)):
+        ch = text[i]
+        if in_string:
+            if ch == '\\' and i + 1 < len(text):
+                continue
+            if ch == string_char:
+                in_string = False
+            continue
+        if ch in ('"', "'", '`'):
+            in_string = True
+            string_char = ch
+            continue
+        if ch == '(':
+            depth += 1
+        elif ch == ')':
+            depth -= 1
+            if depth == 0:
+                return text[start:i]
+    return None
 
 
 def _extract_function_name(line_text):
@@ -527,16 +934,73 @@ def function_back_go(func_name, call_args, vul_lineno, file_path,
                 pass
 
 
+def _propagate_assignments_ast(tree, func_lines, controllable_local):
+    """
+    用 AST 在函数体中传播可控变量标记。
+    遍历 AST 中的赋值语句，如果 RHS 包含可控变量，则标记 LHS。
+    修改 controllable_local in-place。
+    """
+    if tree is None:
+        return
+
+    def _walk(node):
+        lhs_name = None
+        rhs_identifiers = []
+
+        if node.type == 'short_var_declaration':
+            lhs_list = None
+            rhs_list = None
+            for child in node.children:
+                if child.type == 'expression_list':
+                    if lhs_list is None:
+                        lhs_list = child
+                    else:
+                        rhs_list = child
+            if lhs_list and lhs_list.children:
+                first_lhs = lhs_list.children[0]
+                if first_lhs.type == 'identifier':
+                    lhs_name = first_lhs.text.decode('utf-8', errors='ignore')
+            if rhs_list:
+                rhs_identifiers = _collect_identifiers_from_ast(rhs_list)
+
+        elif node.type == 'assignment_statement':
+            lhs_list = None
+            rhs_list = None
+            for child in node.children:
+                if child.type == 'expression_list':
+                    if lhs_list is None:
+                        lhs_list = child
+                    else:
+                        rhs_list = child
+            if lhs_list and lhs_list.children:
+                first_lhs = lhs_list.children[0]
+                if first_lhs.type == 'identifier':
+                    lhs_name = first_lhs.text.decode('utf-8', errors='ignore')
+            if rhs_list:
+                rhs_identifiers = _collect_identifiers_from_ast(rhs_list)
+
+        if lhs_name and lhs_name not in controllable_local:
+            if any(v in controllable_local for v in rhs_identifiers):
+                controllable_local.add(lhs_name)
+
+        for child in node.children:
+            _walk(child)
+
+    _walk(tree.root_node)
+
+
 def _analyze_return_deps_go(formal_params, func_lines, call_args_str,
                             file_path, repair_functions=None, controlled_params=None):
     """
     分析函数返回值与形参的依赖关系（Go 版本的 deps 机制）。
 
+    使用 tree-sitter AST 进行精确分析，正则作为 fallback。
+
     算法：
     1. 建立形参→实参映射
     2. 标记可控形参
-    3. 赋值链传播（函数体内）
-    4. 分析 return 语句
+    3. 赋值链传播（函数体内，使用 AST）
+    4. 分析 return 语句（使用 AST）
 
     返回: (code, caller_var_names)
     """
@@ -580,13 +1044,25 @@ def _analyze_return_deps_go(formal_params, func_lines, call_args_str,
             if _is_controllable_source(actual_expr, controlled_params):
                 controllable_formal.add(fp_name)
 
-    # 3. 赋值链传播（3 轮）
+    # 3. 赋值链传播（AST 优先，正则 fallback）
     controllable_local = set(controllable_formal)
+
+    # 尝试用 AST 进行赋值链传播
+    tree = _parse_go_ast(file_path) if file_path else None
+    if tree:
+        # 在 AST 中查找函数体中的所有赋值语句
+        for _ in range(3):
+            changed = False
+            _propagate_assignments_ast(tree, func_lines, controllable_local)
+            # 如果没有新变量被标记，停止
+            if not changed:
+                break
+
+    # AST 传播后，用正则补充（兼容性）
     for _ in range(3):
         changed = False
         for line_text in func_lines:
-            # 匹配赋值: lhs := rhs 或 lhs = rhs
-            assign_match = re.match(r'(\w+)\s*:?\=\s*(.+)', line_text)
+            assign_match = re.match(r'(\w+)\s*:?=\s*(.+)', line_text)
             if not assign_match:
                 continue
             lhs = assign_match.group(1)
@@ -594,7 +1070,6 @@ def _analyze_return_deps_go(formal_params, func_lines, call_args_str,
             if lhs in controllable_local:
                 continue
             rhs_var_names = set(_extract_var_names_from_expr(rhs))
-            # 也检查简单变量
             simple_rhs = re.match(r'^(\w+)$', rhs)
             if simple_rhs:
                 rhs_var_names.add(simple_rhs.group(1))
@@ -612,10 +1087,7 @@ def _analyze_return_deps_go(formal_params, func_lines, call_args_str,
         return_expr = return_match.group(1).strip()
 
         # 多返回值：取第一个
-        # 但要注意 return result, err 中 result 本身可能包含逗号（结构体等）
-        # 简单处理：取第一个非空表达式
         if ',' in return_expr:
-            # 检查括号深度
             depth = 0
             first_comma = -1
             for ci, ch in enumerate(return_expr):
@@ -652,7 +1124,6 @@ def _analyze_return_deps_go(formal_params, func_lines, call_args_str,
                     actual_expr = arg_map[var]
                     if _is_controllable_source(actual_expr, controlled_params):
                         return (1, [])
-                    # 从实参表达式提取变量名
                     actual_names = _extract_var_names_from_expr(actual_expr)
                     if actual_names:
                         deps.update(actual_names)
@@ -661,7 +1132,6 @@ def _analyze_return_deps_go(formal_params, func_lines, call_args_str,
                         if simple:
                             deps.add(simple.group(1))
                 else:
-                    # 局部变量间接传播
                     deps.update(return_var_names)
             if deps:
                 logger.debug("[AST][Go] Function return depends on caller vars: {}".format(deps))
@@ -713,13 +1183,192 @@ def _trace_variable_in_lines(file_path, var_name, from_line, to_line,
     return result
 
 
+def _analyze_rhs_node(rhs_node, var_name, file_path, lineno, to_line,
+                      repair_functions, controlled_params, depth, max_depth):
+    """
+    根据 RHS AST 节点类型分派分析。
+    返回: 1/2/-1 如果确定，None 如果需要继续扫描。
+    """
+    rhs_text = rhs_node.text.decode('utf-8', errors='ignore')
+
+    # 快速检查：可控源
+    if _is_controllable_source(rhs_text, controlled_params):
+        logger.debug("[AST][Go] Variable {} RHS is controllable source: {}".format(var_name, rhs_text[:80]))
+        return 1
+
+    # 快速检查：修复函数
+    if _is_repair_function(rhs_text, repair_functions):
+        logger.debug("[AST][Go] Variable {} RHS is repaired: {}".format(var_name, rhs_text[:80]))
+        return 2
+
+    node_type = rhs_node.type
+
+    # 字面量 → 安全
+    if _is_literal_node(rhs_node):
+        return -1
+
+    # 函数调用
+    if node_type == 'call_expression':
+        return _handle_call_expression_rhs(
+            rhs_node, var_name, file_path, lineno, to_line,
+            repair_functions, controlled_params, depth, max_depth
+        )
+
+    # 字符串拼接 (binary_expression with +)
+    if node_type == 'binary_expression':
+        return _handle_binary_expression_rhs(
+            rhs_node, var_name, file_path, lineno, to_line,
+            repair_functions, controlled_params, depth, max_depth
+        )
+
+    # 简单变量赋值 a = b
+    if node_type == 'identifier':
+        name = rhs_node.text.decode('utf-8', errors='ignore')
+        if name == var_name:
+            return None  # 自赋值，跳过
+        if _is_controllable_source(name, controlled_params):
+            return 1
+        return _trace_variable_in_lines(
+            file_path, name, lineno, to_line,
+            repair_functions, controlled_params, depth + 1, max_depth
+        )
+
+    # selector_expression (如 r.URL.Query().Get("key"))
+    # 这通常包含在 call_expression 中，但如果是裸的 selector，检查可控源
+    if node_type == 'selector_expression':
+        if _is_controllable_source(rhs_text, controlled_params):
+            return 1
+        # 检查基础变量
+        if rhs_node.children and rhs_node.children[0].type == 'identifier':
+            base = rhs_node.children[0].text.decode('utf-8', errors='ignore')
+            if _is_controllable_source(base, controlled_params):
+                return 1
+
+    # parenthesized_expression → 解包
+    if node_type == 'parenthesized_expression':
+        for child in rhs_node.children:
+            if child.type not in ('(', ')'):
+                return _analyze_rhs_node(
+                    child, var_name, file_path, lineno, to_line,
+                    repair_functions, controlled_params, depth, max_depth
+                )
+
+    # type_conversion_expression (如 string(body))
+    if node_type == 'type_conversion_expression':
+        args = [c for c in rhs_node.children if c.type not in ('(', ')') and not c.type.endswith('_type')]
+        for arg in args:
+            result = _analyze_rhs_node(
+                arg, var_name, file_path, lineno, to_line,
+                repair_functions, controlled_params, depth, max_depth
+            )
+            if result is not None:
+                return result
+
+    # 其他类型：收集标识符逐一追踪
+    var_names = _collect_identifiers_from_ast(rhs_node)
+    for vn in var_names:
+        if vn == var_name:
+            continue
+        if _is_controllable_source(vn, controlled_params):
+            return 1
+        r = _trace_variable_in_lines(
+            file_path, vn, lineno, to_line,
+            repair_functions, controlled_params, depth + 1, max_depth
+        )
+        if r in (1, 2):
+            return r
+
+    return None  # 未确定，继续扫描
+
+
+def _handle_call_expression_rhs(call_node, var_name, file_path, lineno, to_line,
+                                 repair_functions, controlled_params, depth, max_depth):
+    """处理函数调用赋值的 RHS 分析"""
+    func_text = _get_call_func_text(call_node)
+    args = _get_call_args_from_ast(call_node)
+
+    # 检查内置知识库
+    knowledge = lookup_builtin(func_text)
+    if knowledge:
+        if knowledge.get("safe") and not knowledge.get("passthrough"):
+            logger.debug("[AST][Go] RHS call {} is safe per knowledge base".format(func_text))
+            return -1
+        if knowledge.get("passthrough"):
+            # 关键修复：追踪 ALL 非字面量参数，不只是 passthrough 索引
+            for arg_node in args:
+                if _is_literal_node(arg_node):
+                    continue
+                var_names = _collect_identifiers_from_ast(arg_node)
+                for vn in var_names:
+                    if vn == var_name:
+                        continue
+                    if _is_controllable_source(vn, controlled_params):
+                        return 1
+                    r = _trace_variable_in_lines(
+                        file_path, vn, lineno, to_line,
+                        repair_functions, controlled_params, depth + 1, max_depth
+                    )
+                    if r in (1, 2):
+                        return r
+            return None  # passthrough 但参数都安全
+
+    # 未知函数 → 跨函数追踪 (deps 机制)
+    args_str = ', '.join(a.text.decode('utf-8', errors='ignore') for a in args)
+    fb_result = function_back_go(
+        func_text, args_str, lineno, file_path,
+        repair_functions, controlled_params
+    )
+    if isinstance(fb_result, tuple) and len(fb_result) == 2:
+        code, caller_deps = fb_result
+        if code == 'deps' and caller_deps:
+            for dep_var in caller_deps:
+                if dep_var == var_name:
+                    continue
+                r = _trace_variable_in_lines(
+                    file_path, dep_var, lineno, to_line,
+                    repair_functions, controlled_params, depth + 1, max_depth
+                )
+                if r in (1, 2):
+                    return r
+            return 3  # 所有依赖都未确认
+        elif code in (1, 2):
+            return code
+        elif code == 3:
+            return 3
+    return None
+
+
+def _handle_binary_expression_rhs(bin_node, var_name, file_path, lineno, to_line,
+                                   repair_functions, controlled_params, depth, max_depth):
+    """处理字符串拼接 (binary_expression with +) 的 RHS 分析"""
+    for child in bin_node.children:
+        if child.type in ('+', '-', '||', '&&'):
+            continue
+        if _is_literal_node(child):
+            continue
+        var_names = _collect_identifiers_from_ast(child)
+        for vn in var_names:
+            if vn == var_name:
+                continue
+            if _is_controllable_source(vn, controlled_params):
+                return 1
+            r = _trace_variable_in_lines(
+                file_path, vn, lineno, to_line,
+                repair_functions, controlled_params, depth + 1, max_depth
+            )
+            if r in (1, 2):
+                return r
+    return None
+
+
 def _trace_variable_in_lines_impl(file_path, var_name, from_line, to_line,
                                    repair_functions, controlled_params,
                                    depth, max_depth):
     """
-    在指定行范围内追踪变量的数据流
+    在指定行范围内追踪变量的数据流（AST-based 版本）
 
     从 from_line 向上扫描到 to_line，查找 var_name 的赋值和来源。
+    使用 tree-sitter AST 进行精确的赋值分析，正则作为 fallback。
 
     返回值:
         1  — 可控（污点到达用户输入源）
@@ -744,19 +1393,33 @@ def _trace_variable_in_lines_impl(file_path, var_name, from_line, to_line,
     if not lines:
         return -1
 
+    # 用 tree-sitter 解析文件
+    tree = _parse_go_ast(file_path)
+
     # 限制扫描范围
     start = max(0, to_line - 1)
-    end = min(len(lines), from_line)
 
     # 从 vul_lineno 向上扫描
     for i in range(start, max(-1, start - 200), -1):
+        lineno = i + 1  # 1-indexed
         line = lines[i].strip()
 
         # 跳过空行和注释
         if not line or line.startswith('//') or line.startswith('/*'):
             continue
 
-        # 检查赋值语句: var_name = expr 或 var_name := expr
+        # ---- AST 路径：用 tree-sitter 找赋值 ----
+        if tree:
+            rhs_node = _find_assignment_rhs_at_line(tree, lineno, var_name)
+            if rhs_node:
+                result = _analyze_rhs_node(
+                    rhs_node, var_name, file_path, lineno, to_line,
+                    repair_functions, controlled_params, depth, max_depth
+                )
+                if result is not None:
+                    return result
+
+        # ---- 正则 fallback（AST 失败或未命中时） ----
         assign_patterns = [
             r'{}\s*:?=\s*(.+)'.format(re.escape(var_name)),
             r'var\s+{}\s+\w+\s*=\s*(.+)'.format(re.escape(var_name)),
@@ -787,9 +1450,7 @@ def _trace_variable_in_lines_impl(file_path, var_name, from_line, to_line,
                             logger.debug("[AST][Go] Variable {} safe function: {}".format(var_name, func_name))
                             return -1
                         elif knowledge.get("passthrough"):
-                            # 透传函数，继续追踪参数
                             for arg_idx in knowledge["passthrough"]:
-                                # 简单提取第一个参数
                                 arg_match = re.search(r'\(([^,)]+)', expr)
                                 if arg_match:
                                     arg_name = arg_match.group(1).strip()
@@ -803,19 +1464,16 @@ def _trace_variable_in_lines_impl(file_path, var_name, from_line, to_line,
                                             return result
 
                 # 检查函数调用中的参数透传
-                # 如: result := someFunc(userInput)
                 func_call = re.search(r'(\w+(?:\.\w+)*)\s*\((.+)\)', expr)
                 if func_call:
                     func = func_call.group(1)
                     args_str = func_call.group(2)
 
-                    # 检查内置知识库
                     knowledge = lookup_builtin(func)
                     if knowledge:
                         if knowledge.get("safe"):
                             return -1
                         elif knowledge.get("passthrough"):
-                            # 透传，追踪参数
                             args = [a.strip() for a in args_str.split(',')]
                             for arg_idx in knowledge["passthrough"]:
                                 if arg_idx < len(args):
@@ -830,7 +1488,6 @@ def _trace_variable_in_lines_impl(file_path, var_name, from_line, to_line,
                                     if result in (1, 2):
                                         return result
                     else:
-                        # 内置知识库中没有该函数，尝试跨函数追踪（deps 机制）
                         fb_result = function_back_go(
                             func, args_str, i + 1, file_path,
                             repair_functions, controlled_params
@@ -838,8 +1495,6 @@ def _trace_variable_in_lines_impl(file_path, var_name, from_line, to_line,
                         if isinstance(fb_result, tuple) and len(fb_result) == 2:
                             code, caller_deps = fb_result
                             if code == 'deps' and caller_deps:
-                                # 返回值依赖调用者变量，继续在当前作用域追踪
-                                # 关键：从 i（当前赋值行之前）追踪，避免重访同一行
                                 for dep_var in caller_deps:
                                     if dep_var == var_name:
                                         continue
@@ -850,7 +1505,6 @@ def _trace_variable_in_lines_impl(file_path, var_name, from_line, to_line,
                                     )
                                     if dep_result in (1, 2):
                                         return dep_result
-                                # 所有依赖都未确认
                                 return 3
                             elif code in (1, 2):
                                 return code
@@ -869,38 +1523,46 @@ def _trace_variable_in_lines_impl(file_path, var_name, from_line, to_line,
                         return result
 
     # ---- 未找到赋值来源：检查 var_name 是否是某个函数的形参 ----
-    # 如果是，查找该函数的调用点，追踪实际参数
     enclosing_func_name = None
-    for i in range(start, max(-1, start - 200), -1):
-        if i >= len(lines):
-            continue
-        line = lines[i].strip()
-        # 检查 func 定义行
-        func_def_match = re.match(r'^func\s*(?:\([^)]+\)\s*)?(\w+)\s*\((.+)\)', line)
-        if func_def_match:
-            found_func_name = func_def_match.group(1)
-            params_str = func_def_match.group(2)
-            # 处理跨行参数：拼接后续行
-            j = i
-            full_params = params_str
-            while full_params.count('(') > full_params.count(')') and j + 1 < len(lines):
-                j += 1
-                full_params += ' ' + lines[j].strip()
-            # 解析形参
-            for part in _split_args_respecting_parens(full_params):
-                tokens = part.strip().rsplit(' ', 1)
-                if len(tokens) >= 2:
-                    param_name = tokens[0].strip()
-                    if param_name == var_name:
-                        enclosing_func_name = found_func_name
-                        break
-            if enclosing_func_name:
-                break
+
+    # 优先用 AST 查找
+    if tree:
+        func_info = _find_enclosing_function(tree, to_line)
+        if func_info:
+            func_name_ast, params_node, func_start, func_end = func_info
+            if params_node:
+                formal_param_names = _get_formal_param_names(params_node)
+                if var_name in formal_param_names:
+                    enclosing_func_name = func_name_ast
+
+    # AST 失败时回退到正则
+    if not enclosing_func_name:
+        for i in range(start, max(-1, start - 200), -1):
+            if i >= len(lines):
+                continue
+            line = lines[i].strip()
+            func_def_match = re.match(r'^func\s*(?:\([^)]+\)\s*)?(\w+)\s*\((.+)\)', line)
+            if func_def_match:
+                found_func_name = func_def_match.group(1)
+                params_str = func_def_match.group(2)
+                j = i
+                full_params = params_str
+                while full_params.count('(') > full_params.count(')') and j + 1 < len(lines):
+                    j += 1
+                    full_params += ' ' + lines[j].strip()
+                for part in _split_args_respecting_parens(full_params):
+                    tokens = part.strip().rsplit(' ', 1)
+                    if len(tokens) >= 2:
+                        param_name = tokens[0].strip()
+                        if param_name == var_name:
+                            enclosing_func_name = found_func_name
+                            break
+                if enclosing_func_name:
+                    break
 
     if enclosing_func_name:
         logger.debug("[AST][Go] Variable {} is a parameter of function {}, searching call sites".format(
             var_name, enclosing_func_name))
-        # 在当前文件中搜索调用点
         call_result = _trace_param_at_call_sites(
             enclosing_func_name, var_name, file_path, lines,
             repair_functions, controlled_params, depth, max_depth
@@ -1085,56 +1747,78 @@ def scan_parser(rule_match, vul_lineno, file_path,
         logger.debug("[AST][Go] No matching function found in line")
         return results
 
-    # 提取函数参数（支持嵌套括号）
-    # 不使用 [^)]* 正则，改用括号计数法
-    def _extract_args_with_nesting(text, func_name):
-        """从代码行中提取函数调用的完整参数字符串，支持嵌套括号"""
-        # 查找函数调用的起始位置
-        # 优先用完整名称（如 db.Query），回退到短名称（如 Query）
-        idx = text.find(func_name + '(')
-        if idx < 0:
-            short_name = func_name.split('.')[-1]
-            idx = text.find(short_name + '(')
-            if idx < 0:
-                return None
-            idx += len(short_name)
-        else:
-            idx += len(func_name)
+    # ---- tree-sitter 解析整个文件，获取 AST ----
+    ast_tree = _parse_go_ast(file_path)
+    call_node = None
+    ast_args = []  # AST 节点列表
 
-        # idx 现在指向 '(' 的位置
-        if idx >= len(text) or text[idx] != '(':
-            return None
+    if ast_tree is not None:
+        # 在 AST 中查找 vul_lineno 上的 call_expression
+        call_node = _find_call_at_line(ast_tree, vul_lineno, matched_func)
+        if call_node is not None:
+            ast_args = _get_call_args_from_ast(call_node)
 
-        # 括号计数
-        depth = 0
-        in_string = False
-        string_char = None
-        start = idx + 1  # 跳过 '('
+    # AST 提取成功 → 用 AST 节点分析参数
+    if ast_args:
+        # 检查内置知识库
+        knowledge = lookup_builtin(matched_func)
+        if knowledge and knowledge.get("safe"):
+            results.append({'code': -1, 'chain': []})
+            return results
 
-        for i in range(idx, len(text)):
-            ch = text[i]
-            if in_string:
-                if ch == '\\' and i + 1 < len(text):
-                    continue  # 跳过转义字符
-                if ch == string_char:
-                    in_string = False
+        for arg_idx, arg_node in enumerate(ast_args):
+            arg_text = arg_node.text.decode('utf-8', errors='ignore')
+
+            # 字符串字面量 → 跳过
+            if arg_node.type in ('interpreted_string_literal', 'raw_string_literal',
+                                  'int_literal', 'float_literal', 'true', 'false', 'nil'):
+                logger.debug("[AST][Go] Arg[{}] is literal: {}".format(arg_idx, arg_text))
                 continue
-            if ch in ('"', "'", '`'):
-                in_string = True
-                string_char = ch
-                continue
-            if ch == '(':
-                depth += 1
-            elif ch == ')':
-                depth -= 1
-                if depth == 0:
-                    return text[start:i]
-        return None
 
+            # 提取参数中的所有标识符
+            var_names = _collect_identifiers_from_ast(arg_node)
+
+            for var_name in var_names:
+                # 直接可控源
+                if _is_controllable_source(var_name, controlled_params):
+                    logger.debug("[AST][Go] Variable {} controllable".format(var_name))
+                    results.append({'code': 1, 'chain': [
+                        ('source', var_name, file_path, vul_lineno),
+                        ('sink', matched_func, file_path, vul_lineno)
+                    ]})
+                    return results
+
+                # 反向追踪
+                trace_result = _trace_variable_in_lines(
+                    file_path, var_name, vul_lineno, vul_lineno,
+                    repair_functions, controlled_params
+                )
+                if trace_result == 1:
+                    results.append({'code': 1, 'chain': [
+                        ('source', var_name, file_path, vul_lineno),
+                        ('sink', matched_func, file_path, vul_lineno)
+                    ]})
+                    return results
+                elif trace_result == 2:
+                    results.append({'code': 2, 'chain': [
+                        ('repair', var_name, file_path, vul_lineno),
+                        ('sink', matched_func, file_path, vul_lineno)
+                    ]})
+                    return results
+                elif trace_result == 3:
+                    results.append({'code': 3, 'chain': [
+                        ('unconfirmed', var_name, file_path, vul_lineno),
+                        ('sink', matched_func, file_path, vul_lineno)
+                    ]})
+                    return results
+
+        results.append({'code': -1, 'chain': []})
+        return results
+
+    # ---- AST 失败，回退到正则（兼容模式） ----
     args_str = _extract_args_with_nesting(line_text, matched_func)
 
     if args_str is not None:
-        # 提取参数（简单分割，不处理嵌套括号）
         args = [a.strip() for a in args_str.split(',') if a.strip()]
 
         if not args:
