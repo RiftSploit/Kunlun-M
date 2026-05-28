@@ -21,6 +21,8 @@ from utils.log import logger
 from core.pretreatment import ast_object as _ast_object_singleton
 from core.core_engine.trace_cache import TraceCache
 from core.core_engine.go.builtin_knowledge import lookup as lookup_builtin
+from core.core_engine.go.summary_generator import generate_file_summaries, lookup_summary, _summary_registry
+from core.core_engine.function_summary import SummaryCacheManager
 
 # tree-sitter Go AST 解析
 try:
@@ -44,6 +46,10 @@ _trace_cache = TraceCache("go")
 
 # 跨函数追踪递归防护栈
 _scan_function_stack = []
+
+# 函数摘要状态
+_summaries_initialized = False
+_file_summaries = {}
 
 # Go 特有的可控输入源
 GO_CONTROLLED_SOURCES = [
@@ -164,6 +170,41 @@ def _go_line_to_text(file_path, lineno):
     except Exception:
         pass
     return ""
+
+
+def _init_function_summaries(file_path):
+    """初始化当前文件及依赖文件的函数摘要"""
+    global _summaries_initialized, _file_summaries
+
+    if _summaries_initialized:
+        return
+
+    try:
+        pt = _ast_object_singleton
+        if pt and hasattr(pt, 'pre_result'):
+            files_dict = {}
+            for fp, data in pt.pre_result.items():
+                if data.get('language') == 'go':
+                    try:
+                        with open(fp, 'r', encoding='utf-8', errors='ignore') as f:
+                            files_dict[fp] = f.read()
+                    except Exception:
+                        pass
+            # 也加入当前文件
+            try:
+                with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    files_dict[file_path] = f.read()
+            except Exception:
+                pass
+
+            if files_dict:
+                from core.core_engine.go.summary_generator import generate_summaries_for_target
+                _file_summaries = generate_summaries_for_target(file_path, files_dict)
+
+        _summaries_initialized = True
+    except Exception as e:
+        logger.debug(f"[AST][Go] 摘要初始化失败: {e}")
+        _summaries_initialized = True
 
 
 # ---- tree-sitter AST 辅助函数 ----
@@ -968,6 +1009,72 @@ def _find_function_def_in_lines(lines, func_name, from_line=None):
     return None
 
 
+def _judge_from_summary(summary, call_args_str, controlled_params):
+    """根据函数摘要判定返回值可控性。
+
+    对 return_flow 中每条路径独立判定，只要任意一条可控就返回 (1, [])。
+
+    返回: (code, caller_var_names) — 与 function_back_go 返回值格式一致
+    """
+    if controlled_params is None:
+        controlled_params = is_controlled_params
+
+    for rf in summary.return_flow:
+        if rf.origin_type == "param":
+            # 返回值来自形参 → 追踪对应实参
+            for param_idx in rf.dep_params:
+                if param_idx < len(summary.params):
+                    # 从 call_args_str 中提取第 param_idx 个参数
+                    actual_args = _split_args_respecting_parens(call_args_str) if call_args_str else []
+                    if param_idx < len(actual_args):
+                        actual_expr = actual_args[param_idx].strip()
+                        if _is_controllable_source(actual_expr, controlled_params):
+                            return (1, [])
+            # 依赖形参但实参不可控 → 返回 deps
+            actual_args = _split_args_respecting_parens(call_args_str) if call_args_str else []
+            deps = set()
+            for param_idx in rf.dep_params:
+                if param_idx < len(actual_args):
+                    actual_expr = actual_args[param_idx].strip()
+                    names = _extract_var_names_from_expr(actual_expr)
+                    if names:
+                        deps.update(names)
+            if deps:
+                return ('deps', list(deps))
+
+        elif rf.origin_type == "call":
+            # 返回值来自方法调用 → 查内置知识库
+            knowledge = lookup_builtin(rf.origin)
+            if knowledge:
+                if knowledge.get("safe") and not knowledge.get("passthrough"):
+                    continue  # 安全函数，检查下一条路径
+                if knowledge.get("passthrough"):
+                    # 有 passthrough → 检查参数是否可控
+                    for pt_idx in knowledge["passthrough"]:
+                        # 摘要里这个 call 的 dep_params 对应的是当前函数的形参
+                        for param_idx in rf.dep_params:
+                            if param_idx < len(summary.params):
+                                actual_args = _split_args_respecting_parens(call_args_str) if call_args_str else []
+                                if param_idx < len(actual_args):
+                                    if _is_controllable_source(actual_args[param_idx], controlled_params):
+                                        return (1, [])
+            else:
+                # 不是内置函数，检查是否在可控源列表中
+                if _is_controllable_source(rf.origin, controlled_params):
+                    return (1, [])
+
+        elif rf.origin_type == "global":
+            # 返回值来自全局变量 → 检查是否是可控源
+            if _is_controllable_source(rf.origin, controlled_params):
+                return (1, [])
+
+        elif rf.origin_type == "literal":
+            continue  # 字面量不可控
+
+    # 所有路径都不可控
+    return (-1, [])
+
+
 def function_back_go(func_name, call_args, vul_lineno, file_path,
                      repair_functions=None, controlled_params=None):
     """
@@ -998,6 +1105,12 @@ def function_back_go(func_name, call_args, vul_lineno, file_path,
             if knowledge.get("safe") and not knowledge.get("passthrough"):
                 return (-1, [])
             # passthrough 已在 _trace_variable_in_lines 中处理
+
+        # 1.5. 查函数摘要
+        callee_summary = lookup_summary(func_name)
+        if callee_summary and callee_summary.return_flow:
+            # 摘要中有 return_flow，尝试直接判定
+            return _judge_from_summary(callee_summary, call_args, controlled_params)
 
         # 2. 查函数定义索引（预建）
         result = _func_def_index.get((file_path, func_name))
@@ -2055,6 +2168,11 @@ def scan_parser(rule_match, vul_lineno, file_path,
     # ---- 预建函数定义索引（仅首次调用时构建） ----
     _build_func_def_index(file_path)
     _build_func_def_index_cross_file()
+
+    # ---- 初始化函数摘要 ----
+    global _summaries_initialized
+    _summaries_initialized = False
+    _init_function_summaries(file_path)
 
     results = []
 
