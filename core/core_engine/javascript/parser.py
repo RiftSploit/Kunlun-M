@@ -18,6 +18,7 @@ from core.pretreatment import ast_object
 from core.internal_defines.javascript.functions import function_dict, string_function
 from core.core_engine.trace_cache import TraceCache
 from core.core_engine.javascript.builtin_knowledge import lookup as lookup_builtin
+from core.core_engine.javascript.summary_generator import lookup_summary
 
 default_controlled_params = [
     'location.hash',
@@ -57,6 +58,9 @@ is_controlled_params = []
 scan_chain = []  # 回溯链变量
 
 _trace_cache = TraceCache("javascript")
+
+_summaries_initialized = False
+_file_summaries = {}
 
 
 def get_member_data(node, check=False, isparam=False, isclean_prototype=False, isreverse=False):
@@ -897,6 +901,28 @@ def function_call_back(param, nodes, function_params, file_path=None, isback=Fal
                         if is_co2 == 1:
                             return is_co2, cp2, expr_lineno2
                 return 3, param, expr_lineno
+
+        # 查函数摘要
+        callee_summary = lookup_summary(callee_name)
+        if callee_summary and callee_summary.return_flow:
+            call_args = param.arguments or []
+            summary_result = _judge_from_summary_js(callee_summary, call_args)
+            if summary_result is not None:
+                logger.debug("[AST] callee {} matched summary, result={}".format(callee_name, summary_result))
+                if summary_result[0] == 1:
+                    return summary_result
+                if isinstance(summary_result[0], str) and summary_result[0] == 'deps':
+                    # deps: 将变量名映射为调用者实参继续追踪
+                    for dep_var in summary_result[1]:
+                        for idx, arg in enumerate(call_args):
+                            if get_member_data(arg) == dep_var:
+                                is_co2, cp2, expr_lineno2 = parameters_back(arg, nodes, function_params, lineno,
+                                                                             function_flag=0, vul_function=vul_function,
+                                                                             file_path=file_path,
+                                                                             isback=True, method_name=method_name)
+                                if is_co2 == 1:
+                                    return is_co2, cp2, expr_lineno2
+                    return 3, param, expr_lineno
 
         for node in nodes[::-1]:
             if node.type == "FunctionDeclaration" and get_member_data(node.id) == callee_name:
@@ -1836,6 +1862,104 @@ def analysis(all_nodes, vul_function, back_node, vul_lineno, file_path, function
     return scan_results
 
 
+def _init_function_summaries(file_path):
+    """初始化 JS 文件的函数摘要"""
+    global _summaries_initialized, _file_summaries
+
+    if _summaries_initialized:
+        return
+
+    try:
+        from core.core_engine.function_summary import SummaryCacheManager
+        from core.core_engine.javascript.summary_generator import generate_file_summaries, generate_summaries_for_target
+
+        target_dir = file_path
+        pt = ast_object
+        if pt and hasattr(pt, 'target_directory'):
+            target_dir = pt.target_directory
+        elif pt and hasattr(pt, 'pre_result'):
+            paths = list(pt.pre_result.keys())
+            if len(paths) > 1:
+                target_dir = os.path.commonpath(paths)
+            elif paths:
+                target_dir = os.path.dirname(paths[0])
+
+        cache_mgr = SummaryCacheManager()
+
+        files_dict = {}
+        if pt and hasattr(pt, 'pre_result'):
+            for fp, data in pt.pre_result.items():
+                if data.get('language') == 'javascript':
+                    try:
+                        with open(fp, 'r', encoding='utf-8', errors='ignore') as f:
+                            files_dict[fp] = f.read()
+                    except Exception:
+                        pass
+        try:
+            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                files_dict[file_path] = f.read()
+        except Exception:
+            pass
+
+        if files_dict:
+            cached = cache_mgr.load_or_generate(target_dir, files_dict)
+            need_generate = {fp: content for fp, content in files_dict.items()
+                             if not cached.get(fp) or not cached[fp].functions}
+            if need_generate:
+                new_summaries = generate_summaries_for_target(target_dir, need_generate)
+                for fp, fs in new_summaries.items():
+                    cached[fp] = fs
+                    cache_mgr.save_file_summary(target_dir, fp, fs)
+            _file_summaries = cached
+            logger.debug(f"[AST][JS] 摘要初始化完成: {len(_file_summaries)} 个文件")
+
+        _summaries_initialized = True
+    except Exception as e:
+        logger.debug(f"[AST][JS] 摘要初始化失败: {e}")
+        _summaries_initialized = True
+
+
+def _judge_from_summary_js(summary, call_args):
+    """根据函数摘要判定返回值可控性（JS版）
+
+    返回: (code, source, expr_lineno) 三元组或 None
+    """
+    for rf in summary.return_flow:
+        if rf.origin_type == "param":
+            for param_idx in rf.dep_params:
+                if param_idx < len(call_args):
+                    is_co, cp = is_controllable(call_args[param_idx])
+                    if is_co == 1:
+                        return (1, cp, 0)
+                    names = _collect_js_var_names(call_args[param_idx])
+                    if names:
+                        return ('deps', list(names), 0)
+
+        elif rf.origin_type == "global":
+            controlled = is_controlled_params + default_controlled_params
+            for cp_item in controlled:
+                if cp_item in rf.origin:
+                    return (1, rf.origin, 0)
+
+        elif rf.origin_type == "call":
+            controlled = is_controlled_params + default_controlled_params
+            for cp_item in controlled:
+                if cp_item in rf.origin:
+                    return (1, rf.origin, 0)
+            knowledge = lookup_builtin(rf.origin)
+            if knowledge and knowledge.get("passthrough"):
+                for param_idx in rf.dep_params:
+                    if param_idx < len(call_args):
+                        is_co, cp = is_controllable(call_args[param_idx])
+                        if is_co == 1:
+                            return (1, rf.origin, 0)
+
+        elif rf.origin_type == "literal":
+            continue
+
+    return None
+
+
 def scan_parser(sensitive_func, vul_lineno, file_path, repair_functions=[], controlled_params=[]):
     """
     开始检测函数
@@ -1850,6 +1974,9 @@ def scan_parser(sensitive_func, vul_lineno, file_path, repair_functions=[], cont
         global scan_results, is_repair_functions, is_controlled_params, scan_chain
 
         _trace_cache.clear()
+        global _summaries_initialized
+        _summaries_initialized = False
+        _init_function_summaries(file_path)
         scan_chain = ['start']
         scan_results = []
         is_repair_functions = repair_functions
