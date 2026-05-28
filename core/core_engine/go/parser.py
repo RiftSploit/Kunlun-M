@@ -173,16 +173,34 @@ def _go_line_to_text(file_path, lineno):
 
 
 def _init_function_summaries(file_path):
-    """初始化当前文件及依赖文件的函数摘要"""
+    """初始化当前文件及依赖文件的函数摘要（带缓存）"""
     global _summaries_initialized, _file_summaries
 
     if _summaries_initialized:
         return
 
     try:
+        from core.core_engine.function_summary import SummaryCacheManager
+        from core.core_engine.go.summary_generator import generate_file_summaries, generate_summaries_for_target
+
+        # 确定缓存目录（扫描目标根目录下的 .kunlun_cache）
+        target_dir = file_path
         pt = _ast_object_singleton
+        if pt and hasattr(pt, 'target_directory'):
+            target_dir = pt.target_directory
+        elif pt and hasattr(pt, 'pre_result'):
+            # 取公共前缀作为 target_dir
+            paths = list(pt.pre_result.keys())
+            if len(paths) > 1:
+                target_dir = os.path.commonpath(paths)
+            elif paths:
+                target_dir = os.path.dirname(paths[0])
+
+        cache_mgr = SummaryCacheManager()
+
+        # 收集所有 Go 文件内容
+        files_dict = {}
         if pt and hasattr(pt, 'pre_result'):
-            files_dict = {}
             for fp, data in pt.pre_result.items():
                 if data.get('language') == 'go':
                     try:
@@ -190,16 +208,32 @@ def _init_function_summaries(file_path):
                             files_dict[fp] = f.read()
                     except Exception:
                         pass
-            # 也加入当前文件
-            try:
-                with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                    files_dict[file_path] = f.read()
-            except Exception:
-                pass
+        # 也加入当前文件
+        try:
+            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                files_dict[file_path] = f.read()
+        except Exception:
+            pass
 
-            if files_dict:
-                from core.core_engine.go.summary_generator import generate_summaries_for_target
-                _file_summaries = generate_summaries_for_target(file_path, files_dict)
+        if files_dict:
+            # 尝试从缓存加载
+            cached = cache_mgr.load_or_generate(target_dir, files_dict)
+
+            # 需要重新生成的文件
+            need_generate = {fp: content for fp, content in files_dict.items()
+                             if not cached.get(fp) or not cached[fp].functions}
+
+            # 生成缺失的摘要
+            if need_generate:
+                new_summaries = generate_summaries_for_target(target_dir, need_generate)
+                for fp, fs in new_summaries.items():
+                    cached[fp] = fs
+                    # 保存到缓存
+                    cache_mgr.save_file_summary(target_dir, fp, fs)
+
+            _file_summaries = cached
+            logger.debug(f"[AST][Go] 摘要初始化完成: {len(_file_summaries)} 个文件"
+                         f" (缓存命中 {len(files_dict) - len(need_generate)}/{len(files_dict)})")
 
         _summaries_initialized = True
     except Exception as e:

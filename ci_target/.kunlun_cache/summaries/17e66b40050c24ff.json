@@ -1,0 +1,31 @@
+{
+  "file": "/home/ubuntu/.hermes/hermes-agent/Kunlun-M/ci_target/cmd_inject.go",
+  "content_hash": "2ad668b4ab1dd55a37886f597acdcc7b6b5af91a1f0b24d523225fb2940535d8",
+  "functions": [
+    {
+      "name": "handler",
+      "params": [
+        "w",
+        "r"
+      ],
+      "line_range": [
+        9,
+        13
+      ],
+      "return_flow": [],
+      "receiver_name": "",
+      "is_method": false
+    },
+    {
+      "name": "main",
+      "params": [],
+      "line_range": [
+        15,
+        18
+      ],
+      "return_flow": [],
+      "receiver_name": "",
+      "is_method": false
+    }
+  ]
+}
