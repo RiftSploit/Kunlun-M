@@ -1591,6 +1591,76 @@ def _analyze_return_deps_go(formal_params, func_lines, call_args_str,
     return (3, [])
 
 
+def _text_trace_variable(file_path, var_name, vul_lineno,
+                          repair_functions=None, controlled_params=None):
+    """
+    纯文本 fallback 追踪：不依赖 tree-sitter AST。
+    从 vul_lineno 向上逐行查找 var_name 的赋值，判断是否来自可控源。
+    返回: (code, source_lineno)
+    """
+    import re as _re
+    if repair_functions is None:
+        repair_functions = []
+    if controlled_params is None:
+        controlled_params = []
+
+    try:
+        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+            lines = f.readlines()
+    except Exception:
+        return (-1, 0)
+
+    # 向上查找赋值
+    for i in range(vul_lineno - 2, -1, -1):
+        line = lines[i].strip()
+        # 匹配 var_name := ... 或 var_name = ...
+        m = _re.match(r'(?:' + _re.escape(var_name) + r')\s*(?::=|=)\s*(.+)', line)
+        if not m:
+            # 短变量声明 x, y := ... 形式
+            m2 = _re.match(r'[\w,\s]*\b' + _re.escape(var_name) + r'\b\s*:=\s*(.+)', line)
+            if not m2:
+                continue
+            rhs = m2.group(1).strip()
+        else:
+            rhs = m.group(1).strip()
+
+        src_lineno = i + 1
+
+        # 检查是否是函数调用结果
+        # fmt.Fprintf(os.Stdin, ..., r.FormValue(...)) 等
+        # r.FormValue / r.URL.Query / req.FormValue 等 HTTP source
+        http_patterns = [
+            r'\.FormValue\s*\(', r'\.Query\s*\(\)', r'\.Get\s*\(',
+            r'\.URL\.Query', r'\.PostFormValue', r'\.Form\s*\[',
+            r'\.Cookie\s*\(', r'\.Cookies\s*\(',
+        ]
+        for pat in http_patterns:
+            if _re.search(pat, rhs):
+                return (1, src_lineno)
+
+        # 检查是否来自其他变量赋值 → 递归追踪
+        sub_vars = _re.findall(r'[a-zA-Z_]\w*', rhs)
+        for sv in sub_vars:
+            if sv in ('true', 'false', 'nil', 'string', 'int', 'fmt', 'err', 'nil'):
+                continue
+            if sv == var_name:
+                continue
+            # 可控参数列表
+            if sv in controlled_params:
+                return (1, src_lineno)
+            # 递归追踪子变量
+            sub_code, sub_line = _text_trace_variable(
+                file_path, sv, src_lineno, repair_functions, controlled_params
+            )
+            if sub_code == 1:
+                return (1, sub_line)
+
+        # 没有子变量，不可控
+        return (-1, src_lineno)
+
+    return (-1, 0)
+
+
 def _trace_variable_in_lines(file_path, var_name, from_line, to_line,
                               repair_functions=None, controlled_params=None,
                               depth=0, max_depth=5):
@@ -2314,7 +2384,33 @@ def scan_parser(rule_match, vul_lineno, file_path,
         results.append({'code': -1, 'chain': []})
         return results
 
-    # ---- AST 失败：无法提取参数，返回 -1 ----
+    # ---- AST 失败：使用 line_text 文本 fallback ----
+    if not is_config_vuln and line_text:
+        import re as _re_fallback
+        escaped_func = _re_fallback.escape(matched_func)
+        call_match = _re_fallback.search(escaped_func + r'\s*\(([^)]*)\)', line_text)
+        if call_match:
+            args_text = call_match.group(1)
+            for arg in _re_fallback.split(r',\s*', args_text):
+                arg = arg.strip()
+                if _re_fallback.match(r'^"[^"]*"$', arg):
+                    continue
+                var_match = _re_fallback.findall(r'[a-zA-Z_]\w*', arg)
+                for var_name in var_match:
+                    if var_name in ('sh', 'bash', 'c', 'true', 'false', 'nil', 'string', 'int'):
+                        continue
+                    # 简单文本追踪：向上查找 var_name 的赋值来源
+                    code, src_line = _text_trace_variable(
+                        file_path, var_name, vul_lineno,
+                        repair_functions, controlled_params
+                    )
+                    if code == 1:
+                        results.append({'code': 1, 'chain': [
+                            ('source', var_name, file_path, src_line if src_line else vul_lineno),
+                            ('sink', matched_func, file_path, vul_lineno)
+                        ]})
+                        return results
+
     if is_config_vuln:
         results.append({
             'code': 4,

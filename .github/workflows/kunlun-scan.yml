@@ -20,35 +20,10 @@ jobs:
         run: sudo apt-get update -qq && sudo apt-get install -y default-libmysqlclient-dev build-essential pkg-config
       - name: Install dependencies
         run: python -m pip install -r requirements.txt
-      - name: Debug tree-sitter
-        run: |
-          python -c "
-          try:
-              import tree_sitter_go
-              from tree_sitter import Language, Parser
-              lang = Language(tree_sitter_go.language())
-              parser = Parser(lang)
-              tree = parser.parse(b'package main')
-              print('tree-sitter OK, root:', tree.root_node.type)
-          except Exception as e:
-              print('tree-sitter FAILED:', e)
-          "
       - name: Run KunLun CI scan
-        run: |
-          python tools/ci_scan.py --target ci_target --output artifacts/kunlun-ci.json
-          echo "--- DEBUG: Go scan detail ---"
-          python -c "
-          import os, sys, re
-          sys.path.insert(0, '.')
-          with open('ci_target/cmd_inject.go') as f:
-              for i, line in enumerate(f, 1):
-                  print(f'{i}: {line}', end='')
-          "
-          echo "--- DEBUG: Scan output ---"
-          cat artifacts/kunlun-ci.json 2>/dev/null | python -m json.tool 2>/dev/null | head -80
+        run: python tools/ci_scan.py --target ci_target --output artifacts/kunlun-ci.json
       - name: Upload report artifact
         uses: actions/upload-artifact@v4
         with:
           name: kunlun-ci-report
           path: artifacts/kunlun-ci.json
-
