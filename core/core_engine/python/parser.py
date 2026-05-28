@@ -26,7 +26,7 @@ scan_results = []
 is_repair_functions = []
 is_controlled_params = []
 scan_chain = []
-_last_source_lineno = None  # 最近一次追踪到的 source 赋值行号
+# 行号通过函数返回值三元组 (code, source, source_lineno) 传递
 
 # 内置敏感函数列表（用于跨文件间接 sink 检测）
 BUILTIN_SENSITIVE_SINKS = [
@@ -388,7 +388,7 @@ def parameters_back(param_name, nodes, vul_lineno, file_path,
         visited_funcs = set()
 
     if depth > 5:
-        return -1, None
+        return -1, None, 0
 
     # 查缓存
     if vul_lineno and file_path:
@@ -398,7 +398,7 @@ def parameters_back(param_name, nodes, vul_lineno, file_path,
 
     tree = _ast_object_singleton.get_nodes(file_path)
     if not tree or not hasattr(tree, 'body'):
-        return -1, None
+        return -1, None, 0
 
     # 收集 vul_lineno 之前的所有顶层语句
     all_stmts = tree.body
@@ -533,7 +533,7 @@ def _trace_self_attribute(attr_name, class_node, vul_lineno, file_path,
                             if arg.arg == rhs_name and arg.arg != 'self':
                                 logger.debug("[AST][Python] self.{} comes from __init__ param {}".format(
                                     attr, rhs_name))
-                                return 4, init_method
+                                return 4, init_method, vul_lineno
 
     # 如果 __init__ 中没找到赋值，检查是否有 @property 方法
     # 支持类继承：先在当前类找，找不到去父类找
@@ -631,7 +631,7 @@ def _trace_in_stmts(param_name, stmts, vul_lineno, file_path,
         if result is not None:
             # 处理函数返回的依赖变量：赋值右部是函数调用，返回值依赖调用者变量
             # 需要继续向上查找这些变量的更早赋值
-            if isinstance(result, tuple) and len(result) == 2 and result[0] == 'deps':
+            if isinstance(result, tuple) and len(result) >= 2 and result[0] == 'deps':
                 dep_vars = result[1]
                 logger.debug("[AST][Python] Assignment at line {} returns deps: {}, continuing upward trace".format(
                     stmt.lineno, dep_vars))
@@ -643,11 +643,11 @@ def _trace_in_stmts(param_name, stmts, vul_lineno, file_path,
                                              repair_functions, controlled_params,
                                              visited_funcs, depth, tree, func_node)
                             if r is not None:
-                                if isinstance(r, tuple) and len(r) == 2 and r[0] == 'deps':
+                                if isinstance(r, tuple) and len(r) >= 2 and r[0] == 'deps':
                                     continue  # 依赖链太深，跳过
                                 return r
                 # 所有依赖变量都没找到可控来源，返回未确认
-                return 3, None
+                return 3, None, vul_lineno
             return result
 
     # 如果在函数内且没找到赋值，检查是否是函数参数
@@ -657,7 +657,7 @@ def _trace_in_stmts(param_name, stmts, vul_lineno, file_path,
                 logger.debug("[AST][Python] Param {} is function argument of {}".format(
                     param_name, func_node.name))
                 # 返回 code 4：新漏洞函数
-                return 4, func_node
+                return 4, func_node, vul_lineno
 
     # 如果是 self.xxx 属性，到 __init__ 中查找赋值
     if func_node and param_name.startswith('self.'):
@@ -674,9 +674,9 @@ def _trace_in_stmts(param_name, stmts, vul_lineno, file_path,
         for s in func_node.body:
             if isinstance(s, ast.Global) and param_name in s.names:
                 logger.debug("[AST][Python] Param {} is global variable".format(param_name))
-                return 5, None
+                return 5, None, vul_lineno
 
-    return -1, None
+    return -1, None, 0
 
 
 def _trace_stmt(param_name, stmt, vul_lineno, file_path,
@@ -798,20 +798,17 @@ def _trace_expr(param_name, expr, lineno, file_path,
                  repair_functions, controlled_params,
                  visited_funcs, depth, tree):
     """追踪表达式的来源"""
-    global _last_source_lineno
-
     expr_str = _expr_to_str(expr)
 
     # 1. 检查是否是可控输入源
     if is_controllable(expr_str, controlled_params):
         logger.debug("[AST][Python] Found controllable source: {} at line {}".format(expr_str, lineno))
-        _last_source_lineno = lineno
-        return 1, expr_str
+        return 1, expr_str, lineno
 
     # 2. 检查是否经过修复函数
     if is_repair(expr_str, repair_functions):
         logger.debug("[AST][Python] Found repair function: {} at line {}".format(expr_str, lineno))
-        return 2, expr_str
+        return 2, expr_str, lineno
 
     # 3. 如果表达式是函数调用，检查参数
     if isinstance(expr, ast.Call):
@@ -821,8 +818,7 @@ def _trace_expr(param_name, expr, lineno, file_path,
             arg_str = _expr_to_str(arg)
             if is_controllable(arg_str, controlled_params):
                 logger.debug("[AST][Python] Call {} with controllable arg: {}".format(call_name, arg_str))
-                _last_source_lineno = lineno
-                return 1, arg_str
+                return 1, arg_str, lineno
 
             # 递归追踪参数
             arg_names = _collect_names(arg)
@@ -850,7 +846,7 @@ def _trace_expr(param_name, expr, lineno, file_path,
 
         # 检查是否是修复函数调用
         if call_name and is_repair(call_name, repair_functions):
-            return 2, call_name
+            return 2, call_name, lineno
 
         # 尝试进入函数定义追踪
         if call_name:
@@ -933,7 +929,7 @@ def _trace_expr(param_name, expr, lineno, file_path,
         # 所有候选的 _resolve_code4 都失败，返回第一个（让 scan_parser 的 _resolve_code4 继续尝试）
         return code4_candidates[0]
 
-    return 3, None
+    return 3, None, 0
 
 
 def _find_function_def(tree, func_name):
@@ -980,7 +976,7 @@ def _trace_function_return(func_def, call_node, lineno, file_path,
         knowledge = lookup_builtin(call_func_name)
         if knowledge:
             if knowledge["safe"] and not knowledge["passthrough"]:
-                return -1, None
+                return -1, None, 0
             if knowledge["passthrough"]:
                 deps = set()
                 for arg_idx in knowledge["passthrough"]:
@@ -989,7 +985,7 @@ def _trace_function_return(func_def, call_node, lineno, file_path,
                         deps.update(arg_names)
                 if deps:
                     return ('deps', list(deps), getattr(call_node, 'lineno', lineno))
-            return -1, None  # 不透传 → 安全
+            return -1, None, 0  # 不透传 → 安全
 
     # 建立参数映射：调用实参 → 函数形参
     arg_map = {}
@@ -1032,7 +1028,7 @@ def _trace_function_return(func_def, call_node, lineno, file_path,
             if is_controllable(return_str, controlled_params):
                 logger.debug("[AST][Python] Function {} returns controllable source directly: {}".format(
                     func_name, return_str))
-                return 1, return_str
+                return 1, return_str, lineno
 
             # 检查返回值中引用的变量是否在可控局部变量集合中
             return_names = _collect_names(node.value)
@@ -1048,7 +1044,7 @@ def _trace_function_return(func_def, call_node, lineno, file_path,
                         # 形参直接出现在返回值中 → 取对应实参的变量名
                         arg_str = arg_map[var_name]
                         if is_controllable(arg_str, controlled_params):
-                            return 1, arg_str
+                            return 1, arg_str, lineno
                         deps.update(_collect_names_from_str(arg_str))
                     else:
                         # 局部变量间接传播 → 其来源仍可追溯到形参
@@ -1056,7 +1052,7 @@ def _trace_function_return(func_def, call_node, lineno, file_path,
                 if deps:
                     logger.debug("[AST][Python] Function {} return depends on caller vars: {}".format(
                         func_name, deps))
-                    return 'deps', list(deps)
+                    return 'deps', list(deps), lineno
 
             # fallback: 文本匹配形参名出现在返回值中
             return_str = _expr_to_str(node.value)
@@ -1065,16 +1061,16 @@ def _trace_function_return(func_def, call_node, lineno, file_path,
                     if param_name in return_str or _contains_name(node.value, param_name):
                         logger.debug("[AST][Python] Function {} returns controllable param {} (text match)".format(
                             func_name, param_name))
-                        return 1, arg_str
+                        return 1, arg_str, lineno
 
     # 返回值没有明确的可控来源，但有未确认的调用者变量
     # 把 caller_var_names 交给上层继续追踪
     if caller_var_names:
         logger.debug("[AST][Python] Function {} return may depend on caller vars: {}".format(
             func_name, caller_var_names))
-        return 'deps', list(caller_var_names)
+        return 'deps', list(caller_var_names), 0
 
-    return 3, None
+    return 3, None, 0
 
 
 # ---------------------------------------------------------------------------
@@ -1095,7 +1091,7 @@ def _resolve_code4(func_def, tree, file_path, sensitive_func,
     if depth > 3 or not isinstance(func_def, (ast.FunctionDef, ast.AsyncFunctionDef)):
         return None
 
-    source_ln = _last_source_lineno if _last_source_lineno else target_line
+    source_ln = target_line
     chain = ["{}:{}".format(source_ln, source_lines[source_ln - 1].strip()
                             if source_ln <= len(source_lines) else arg_str)]
 
@@ -1221,11 +1217,10 @@ def scan_parser(sensitive_func, vul_lineno, file_path, repair_functions=[], cont
     :param svid: 规则 ID
     :return: scan_results 列表，每个元素是 {"code": N, "chain": [...], "source": ...}
     """
-    global scan_results, is_repair_functions, is_controlled_params, scan_chain, _trace_visited, _last_source_lineno
+    global scan_results, is_repair_functions, is_controlled_params, scan_chain, _trace_visited
 
     # 清空追踪去重集合和缓存
     _trace_visited = set()
-    _last_source_lineno = None
     _trace_cache.clear()
 
     try:
@@ -1298,7 +1293,7 @@ def scan_parser(sensitive_func, vul_lineno, file_path, repair_functions=[], cont
                 # 第一轮：用 parameters_back 标记 rhs 中可控的变量
                 for lhs_name, rhs_names in assign_map.items():
                     for rn in rhs_names:
-                        code, _ = parameters_back(rn, [], target_line, file_path,
+                        code, _, _ = parameters_back(rn, [], target_line, file_path,
                                                    repair_functions, controlled_params)
                         if code == 1:
                             extra_controlled.add(lhs_name)
@@ -1325,7 +1320,7 @@ def scan_parser(sensitive_func, vul_lineno, file_path, repair_functions=[], cont
 
                 # 直接检查参数是否是可控源（含传播后的变量）
                 if is_controllable(arg_str, extended_controlled):
-                    source_ln = _last_source_lineno if _last_source_lineno else target_line
+                    source_ln = target_line
                     chain = ["{}:{}".format(source_ln, source_lines[source_ln - 1].strip() if source_ln <= len(source_lines) else arg_str)]
                     scan_results.append({"code": 1, "chain": chain, "source": arg_str})
                     break
@@ -1335,13 +1330,13 @@ def scan_parser(sensitive_func, vul_lineno, file_path, repair_functions=[], cont
                 # 收集所有追踪结果，排序后优先处理有 sink 的函数
                 traced_results = []
                 for an in arg_names:
-                    code, cp = parameters_back(an, [], target_line, file_path,
+                    code, cp, src_ln = parameters_back(an, [], target_line, file_path,
                                                 repair_functions, extended_controlled)
-                    traced_results.append((code, cp, an))
+                    traced_results.append((code, cp, an, src_ln))
                 
                 # 排序：code=1/2 优先，code=4 中 __init__ 最低
                 def _sort_key(item):
-                    c, cp, _ = item
+                    c, cp, _, _ = item
                     if c in (1, 2): return (0, 0)
                     if c == 4:
                         fn = getattr(cp, 'name', '') if cp else ''
@@ -1349,8 +1344,8 @@ def scan_parser(sensitive_func, vul_lineno, file_path, repair_functions=[], cont
                     return (2, 0)
                 traced_results.sort(key=_sort_key)
                 
-                for code, cp, an in traced_results:
-                    source_ln = _last_source_lineno if _last_source_lineno else target_line
+                for code, cp, an, src_ln in traced_results:
+                    source_ln = src_ln if src_ln else target_line
                     chain = ["{}:{}".format(source_ln, source_lines[source_ln - 1].strip() if source_ln <= len(source_lines) else arg_str)]
 
                     if code == 1:
@@ -1404,7 +1399,7 @@ def scan_parser(sensitive_func, vul_lineno, file_path, repair_functions=[], cont
                     scan_results = cross_file_result
                 else:
                     # 最终 fallback
-                    source_ln = _last_source_lineno if _last_source_lineno else target_line
+                    source_ln = target_line
                     chain = ["{}:{}".format(source_ln, source_lines[source_ln - 1].strip() if source_ln <= len(source_lines) else call_name)]
                     scan_results.append({"code": -1, "chain": chain, "source": None})
 
@@ -1531,12 +1526,13 @@ def _try_cross_file_trace(tree, target_line, sensitive_func, file_path,
                 # 反向追踪
                 arg_names = _collect_names(arg)
                 for an in arg_names:
-                    code, cp = parameters_back(an, [], target_line, file_path,
+                    code, cp, src_ln = parameters_back(an, [], target_line, file_path,
                                                 repair_functions, controlled_params)
                     if code == 1:
+                        source_ln = src_ln if src_ln else target_line
                         chain = ["{}:{}".format(
-                            target_line,
-                            source_lines[target_line - 1].strip() if target_line <= len(source_lines) else call_name)]
+                            source_ln,
+                            source_lines[source_ln - 1].strip() if source_ln <= len(source_lines) else call_name)]
                         return [{"code": 1, "chain": chain, "source": cp}]
 
             # 直接参数不可控，如果是类方法，检查 self.xxx 属性来源
@@ -1664,12 +1660,13 @@ def _trace_cross_file_self_attribute(imported_tree, method_def, caller_tree,
             # 反向追踪构造参数
             arg_names = _collect_names(ctor_arg)
             for an in arg_names:
-                code, cp = parameters_back(an, [], ctor_call.lineno if hasattr(ctor_call, 'lineno') else target_line,
+                code, cp, src_ln = parameters_back(an, [], ctor_call.lineno if hasattr(ctor_call, 'lineno') else target_line,
                                             file_path, repair_functions, controlled_params)
                 if code == 1:
+                    source_ln = src_ln if src_ln else target_line
                     chain = ["{}:{}".format(
-                        target_line,
-                        source_lines[target_line - 1].strip() if target_line <= len(source_lines) else _get_call_name(call_node))]
+                        source_ln,
+                        source_lines[source_ln - 1].strip() if source_ln <= len(source_lines) else _get_call_name(call_node))]
                     return [{"code": 1, "chain": chain, "source": cp}]
     
     return None
@@ -1691,10 +1688,7 @@ def analysis_params(param, expr_lineno, vul_function, line, file_path,
     :return: (code, cp, expr_lineno, chain)
     """
     try:
-        global _last_source_lineno
-        _last_source_lineno = int(line)  # 默认值
-
-        code, cp = parameters_back(param, [], int(line), file_path,
+        code, cp, src_ln = parameters_back(param, [], int(line), file_path,
                                     repair_functions, controlled_params)
 
         # 构建 chain
@@ -1705,7 +1699,7 @@ def analysis_params(param, expr_lineno, vul_function, line, file_path,
         except Exception:
             pass
 
-        source_ln = _last_source_lineno if _last_source_lineno else int(line)
+        source_ln = src_ln if src_ln else int(line)
         chain = ["{}:{}".format(source_ln, source_lines[source_ln - 1].strip() if source_ln <= len(source_lines) else param)]
 
         return code, cp, source_ln, chain
