@@ -44,6 +44,7 @@ _trace_cache = TraceCache("go")
 
 # 跨函数追踪递归防护栈
 _scan_function_stack = []
+_last_source_lineno = None  # 最近一次 trace 找到的 source 赋值行号
 
 # Go 特有的可控输入源
 GO_CONTROLLED_SOURCES = [
@@ -1728,6 +1729,8 @@ def _trace_variable_in_lines_impl(file_path, var_name, from_line, to_line,
     result_tuple = _find_assignment_in_block(body_block, var_name)
     if result_tuple:
         rhs_node, lineno = result_tuple
+        global _last_source_lineno
+        _last_source_lineno = lineno
         # 用 trace_go_expr 分析 RHS
         result = trace_go_expr(
             var_name, rhs_node, file_path, lineno, to_line,
@@ -2124,11 +2127,13 @@ def scan_parser(rule_match, vul_lineno, file_path,
             var_names = _collect_identifiers_from_ast(arg_node)
 
             for var_name in var_names:
+                global _last_source_lineno
+                _last_source_lineno = vul_lineno  # 默认值
                 # 直接可控源
                 if _is_controllable_source(var_name, controlled_params):
                     logger.debug("[AST][Go] Variable {} controllable".format(var_name))
                     results.append({'code': 1, 'chain': [
-                        ('source', var_name, file_path, vul_lineno),
+                        ('source', var_name, file_path, _last_source_lineno),
                         ('sink', matched_func, file_path, vul_lineno)
                     ]})
                     return results
@@ -2140,19 +2145,19 @@ def scan_parser(rule_match, vul_lineno, file_path,
                 )
                 if trace_result == 1:
                     results.append({'code': 1, 'chain': [
-                        ('source', var_name, file_path, vul_lineno),
+                        ('source', var_name, file_path, _last_source_lineno),
                         ('sink', matched_func, file_path, vul_lineno)
                     ]})
                     return results
                 elif trace_result == 2:
                     results.append({'code': 2, 'chain': [
-                        ('repair', var_name, file_path, vul_lineno),
+                        ('repair', var_name, file_path, _last_source_lineno),
                         ('sink', matched_func, file_path, vul_lineno)
                     ]})
                     return results
                 elif trace_result == 3:
                     results.append({'code': 3, 'chain': [
-                        ('unconfirmed', var_name, file_path, vul_lineno),
+                        ('unconfirmed', var_name, file_path, _last_source_lineno),
                         ('sink', matched_func, file_path, vul_lineno)
                     ]})
                     return results
@@ -2203,16 +2208,19 @@ def analysis_params(param_name, parent_func_names, vul_function, lineno, file_pa
         return -1, [], 0, []
 
     # 追踪变量
+    global _last_source_lineno
+    _last_source_lineno = lineno  # 默认值
+
     trace_result = _trace_variable_in_lines(
         file_path, param_name, lineno, lineno,
         repair_functions, controlled_params
     )
 
     if trace_result == 1:
-        return 1, controlled_params, lineno, [('source', param_name, file_path, lineno)]
+        return 1, controlled_params, lineno, [('source', param_name, file_path, _last_source_lineno)]
     elif trace_result == 2:
-        return 2, controlled_params, lineno, [('repair', param_name, file_path, lineno)]
+        return 2, controlled_params, lineno, [('repair', param_name, file_path, _last_source_lineno)]
     elif trace_result == 3:
-        return 3, controlled_params, lineno, [('unconfirmed', param_name, file_path, lineno)]
+        return 3, controlled_params, lineno, [('unconfirmed', param_name, file_path, _last_source_lineno)]
     else:
         return -1, [], 0, []
