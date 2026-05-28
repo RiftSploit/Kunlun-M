@@ -26,6 +26,7 @@ scan_results = []
 is_repair_functions = []
 is_controlled_params = []
 scan_chain = []
+_last_source_lineno = None  # 最近一次追踪到的 source 赋值行号
 
 # 内置敏感函数列表（用于跨文件间接 sink 检测）
 BUILTIN_SENSITIVE_SINKS = [
@@ -797,12 +798,14 @@ def _trace_expr(param_name, expr, lineno, file_path,
                  repair_functions, controlled_params,
                  visited_funcs, depth, tree):
     """追踪表达式的来源"""
+    global _last_source_lineno
 
     expr_str = _expr_to_str(expr)
 
     # 1. 检查是否是可控输入源
     if is_controllable(expr_str, controlled_params):
         logger.debug("[AST][Python] Found controllable source: {} at line {}".format(expr_str, lineno))
+        _last_source_lineno = lineno
         return 1, expr_str
 
     # 2. 检查是否经过修复函数
@@ -818,6 +821,7 @@ def _trace_expr(param_name, expr, lineno, file_path,
             arg_str = _expr_to_str(arg)
             if is_controllable(arg_str, controlled_params):
                 logger.debug("[AST][Python] Call {} with controllable arg: {}".format(call_name, arg_str))
+                _last_source_lineno = lineno
                 return 1, arg_str
 
             # 递归追踪参数
@@ -1091,8 +1095,9 @@ def _resolve_code4(func_def, tree, file_path, sensitive_func,
     if depth > 3 or not isinstance(func_def, (ast.FunctionDef, ast.AsyncFunctionDef)):
         return None
 
-    chain = ["{}:{}".format(target_line, source_lines[target_line - 1].strip()
-                            if target_line <= len(source_lines) else arg_str)]
+    source_ln = _last_source_lineno if _last_source_lineno else target_line
+    chain = ["{}:{}".format(source_ln, source_lines[source_ln - 1].strip()
+                            if source_ln <= len(source_lines) else arg_str)]
 
     # ---- 检查函数体内是否有敏感调用（直接或间接） ----
     has_sink = _func_has_sink(func_def, sensitive_func)
@@ -1216,10 +1221,11 @@ def scan_parser(sensitive_func, vul_lineno, file_path, repair_functions=[], cont
     :param svid: 规则 ID
     :return: scan_results 列表，每个元素是 {"code": N, "chain": [...], "source": ...}
     """
-    global scan_results, is_repair_functions, is_controlled_params, scan_chain, _trace_visited
+    global scan_results, is_repair_functions, is_controlled_params, scan_chain, _trace_visited, _last_source_lineno
 
     # 清空追踪去重集合和缓存
     _trace_visited = set()
+    _last_source_lineno = None
     _trace_cache.clear()
 
     try:
@@ -1319,7 +1325,8 @@ def scan_parser(sensitive_func, vul_lineno, file_path, repair_functions=[], cont
 
                 # 直接检查参数是否是可控源（含传播后的变量）
                 if is_controllable(arg_str, extended_controlled):
-                    chain = ["{}:{}".format(target_line, source_lines[target_line - 1].strip() if target_line <= len(source_lines) else arg_str)]
+                    source_ln = _last_source_lineno if _last_source_lineno else target_line
+                    chain = ["{}:{}".format(source_ln, source_lines[source_ln - 1].strip() if source_ln <= len(source_lines) else arg_str)]
                     scan_results.append({"code": 1, "chain": chain, "source": arg_str})
                     break
 
@@ -1343,8 +1350,8 @@ def scan_parser(sensitive_func, vul_lineno, file_path, repair_functions=[], cont
                 traced_results.sort(key=_sort_key)
                 
                 for code, cp, an in traced_results:
-
-                    chain = ["{}:{}".format(target_line, source_lines[target_line - 1].strip() if target_line <= len(source_lines) else arg_str)]
+                    source_ln = _last_source_lineno if _last_source_lineno else target_line
+                    chain = ["{}:{}".format(source_ln, source_lines[source_ln - 1].strip() if source_ln <= len(source_lines) else arg_str)]
 
                     if code == 1:
                         scan_results.append({"code": 1, "chain": chain, "source": cp})
@@ -1397,7 +1404,8 @@ def scan_parser(sensitive_func, vul_lineno, file_path, repair_functions=[], cont
                     scan_results = cross_file_result
                 else:
                     # 最终 fallback
-                    chain = ["{}:{}".format(target_line, source_lines[target_line - 1].strip() if target_line <= len(source_lines) else call_name)]
+                    source_ln = _last_source_lineno if _last_source_lineno else target_line
+                    chain = ["{}:{}".format(source_ln, source_lines[source_ln - 1].strip() if source_ln <= len(source_lines) else call_name)]
                     scan_results.append({"code": -1, "chain": chain, "source": None})
 
             # 只处理第一个匹配的调用
@@ -1683,6 +1691,9 @@ def analysis_params(param, expr_lineno, vul_function, line, file_path,
     :return: (code, cp, expr_lineno, chain)
     """
     try:
+        global _last_source_lineno
+        _last_source_lineno = int(line)  # 默认值
+
         code, cp = parameters_back(param, [], int(line), file_path,
                                     repair_functions, controlled_params)
 
@@ -1694,9 +1705,10 @@ def analysis_params(param, expr_lineno, vul_function, line, file_path,
         except Exception:
             pass
 
-        chain = ["{}:{}".format(line, source_lines[int(line) - 1].strip() if int(line) <= len(source_lines) else param)]
+        source_ln = _last_source_lineno if _last_source_lineno else int(line)
+        chain = ["{}:{}".format(source_ln, source_lines[source_ln - 1].strip() if source_ln <= len(source_lines) else param)]
 
-        return code, cp, line, chain
+        return code, cp, source_ln, chain
 
     except Exception:
         logger.warning("[AST][Python] analysis_params error: {}".format(traceback.format_exc()))
