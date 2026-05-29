@@ -95,6 +95,9 @@ tests/*
 # new rule for test
 rules/tamper/*
 !rules/tamper/demo.py
+!rules/tamper/demo_go.py
+!rules/tamper/demo_java.py
+!rules/tamper/demo_python.py
 !rules/tamper/wordpress.py
 !rules/tamper/__init__.py
 
