@@ -65,26 +65,38 @@ class Rule(object):
         origin_lans = ["base"]
         origin_lans.extend(self.lans)
 
+        # 语言别名映射：javascript 同时扫描 rules/nodejs/ 目录
+        _lan_aliases = {
+            "javascript": ["nodejs"],
+        }
+
         self.rule_dict = {}
 
         # 逐个处理每一种lan
         for lan in origin_lans:
-            self.rules_path = RULES_PATH + "/" + lan
-            if not os.path.exists(self.rules_path):
-                logger.error("[INIT][RULE] language {} can't found rules".format(self.rules_path))
-                os.mkdir(self.rules_path)
+            # 主目录
+            dirs_to_scan = [lan]
+            # 别名目录
+            dirs_to_scan.extend(_lan_aliases.get(lan, []))
 
-            self.rule_list = self.list_parse()
+            for dir_name in dirs_to_scan:
+                self.rules_path = RULES_PATH + "/" + dir_name
+                if not os.path.exists(self.rules_path):
+                    if dir_name == lan:
+                        logger.error("[INIT][RULE] language {} can't found rules".format(self.rules_path))
+                        os.mkdir(self.rules_path)
+                    continue
 
-            # import function from rule
-            for rule in self.rule_list:
-                rulename = rule.split('.')[0]
-                rulefile = "rules." + lan + "." + rulename
+                self.rule_list = self.list_parse()
 
-                try:
-                    self.rule_dict[rulename] = __import__(rulefile, fromlist=rulename)
-                except Exception as e:
-                    logger.error("[INIT][RULE] Failed to load rule {}: {}".format(rulename, e))
+                for rule in self.rule_list:
+                    rulename = rule.split('.')[0]
+                    rulefile = "rules." + dir_name + "." + rulename
+
+                    try:
+                        self.rule_dict[rulename] = __import__(rulefile, fromlist=rulename)
+                    except Exception as e:
+                        logger.error("[INIT][RULE] Failed to load rule {}: {}".format(rulename, e))
 
         self.vulnerabilities = self.vul_init()
 
@@ -105,6 +117,11 @@ class Rule(object):
             count = r.reload()
             print(f"已重新加载 {count} 条规则")
         """
+        # 语言别名映射：javascript 同时扫描 rules/nodejs/ 目录
+        _lan_aliases = {
+            "javascript": ["nodejs"],
+        }
+
         origin_lans = ["base"]
         origin_lans.extend(self.lans)
 
@@ -113,33 +130,40 @@ class Rule(object):
         count = 0
 
         for lan in origin_lans:
-            self.rules_path = RULES_PATH + "/" + lan
-            if not os.path.exists(self.rules_path):
-                logger.error("[RELOAD][RULE] language {} can't found rules".format(self.rules_path))
-                continue
+            # 主目录
+            dirs_to_scan = [lan]
+            # 别名目录
+            dirs_to_scan.extend(_lan_aliases.get(lan, []))
 
-            self.rule_list = self.list_parse()
+            for dir_name in dirs_to_scan:
+                self.rules_path = RULES_PATH + "/" + dir_name
+                if not os.path.exists(self.rules_path):
+                    if dir_name == lan:
+                        logger.error("[RELOAD][RULE] language {} can't found rules".format(self.rules_path))
+                    continue
 
-            for rule in self.rule_list:
-                rulename = rule.split('.')[0]
-                rulefile = "rules." + lan + "." + rulename
+                self.rule_list = self.list_parse()
 
-                try:
-                    # 对已导入的模块执行 reload，新模块直接 import
-                    if rulename in old_rule_dict:
-                        module = old_rule_dict[rulename]
-                        module = importlib.reload(module)
-                        self.rule_dict[rulename] = module
-                    else:
-                        self.rule_dict[rulename] = __import__(rulefile, fromlist=rulename)
+                for rule in self.rule_list:
+                    rulename = rule.split('.')[0]
+                    rulefile = "rules." + dir_name + "." + rulename
 
-                    count += 1
-                except Exception as e:
-                    logger.error("[RELOAD][RULE] Failed to load rule {}: {}".format(rulename, e))
-                    # 如果 reload 失败，尝试保留旧版本
-                    if rulename in old_rule_dict:
-                        self.rule_dict[rulename] = old_rule_dict[rulename]
-                        logger.warning("[RELOAD][RULE] Keeping previous version of rule {}".format(rulename))
+                    try:
+                        # 对已导入的模块执行 reload，新模块直接 import
+                        if rulename in old_rule_dict:
+                            module = old_rule_dict[rulename]
+                            module = importlib.reload(module)
+                            self.rule_dict[rulename] = module
+                        else:
+                            self.rule_dict[rulename] = __import__(rulefile, fromlist=rulename)
+
+                        count += 1
+                    except Exception as e:
+                        logger.error("[RELOAD][RULE] Failed to load rule {}: {}".format(rulename, e))
+                        # 如果 reload 失败，尝试保留旧版本
+                        if rulename in old_rule_dict:
+                            self.rule_dict[rulename] = old_rule_dict[rulename]
+                            logger.warning("[RELOAD][RULE] Keeping previous version of rule {}".format(rulename))
 
         self.vulnerabilities = self.vul_init()
         logger.info("[RELOAD][RULE] Reloaded {} rules, total {} rules loaded".format(count, len(self.rule_dict)))
