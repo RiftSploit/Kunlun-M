@@ -363,7 +363,7 @@ class FileParseAll:
                     for m in matchs:
 
                         data = m.group(0).strip()
-                        LRnumber = content[:m.start()].count('\n')
+                        LRnumber = content[:m.start()].count('\n') + m.group(0).count('\n')
                         match_numer = line_number - 10 + LRnumber
 
                         result.append((filepath, str(match_numer), data))
@@ -380,7 +380,7 @@ class FileParseAll:
 
                     for m in matchs:
                         data = m.group(0).strip()
-                        LRnumber = content[:m.start()].count('\n')
+                        LRnumber = content[:m.start()].count('\n') + m.group(0).count('\n')
                         match_numer = line_number - i + LRnumber
 
                         result.append((filepath, str(match_numer), data))
