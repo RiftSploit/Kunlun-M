@@ -45,6 +45,52 @@ default_controlled_params = [
     # new api
     '.addEventListener',
     # 'location',
+
+    # ===== Node.js: Express/Connect =====
+    'req.query',
+    'req.body',
+    'req.params',
+    'req.headers',
+    'req.cookies',
+    'req.files',
+    'req.query.',
+    'req.body.',
+    'req.params.',
+    'req.headers.',
+    'req.cookies.',
+
+    # ===== Node.js: Koa =====
+    'ctx.query',
+    'ctx.params',
+    'ctx.request.body',
+    'ctx.request.query',
+    'ctx.request.header',
+    'ctx.request.headers',
+    'ctx.query.',
+    'ctx.params.',
+    'ctx.request.body.',
+    'ctx.request.query.',
+
+    # ===== Node.js: Hapi =====
+    'request.query',
+    'request.params',
+    'request.payload',
+    'request.headers',
+
+    # ===== Node.js: Fastify =====
+    'request.query',
+    'request.body',
+    'request.params',
+    'request.headers',
+
+    # ===== Node.js: process =====
+    'process.env',
+    'process.argv',
+
+    # ===== Node.js: 原生 http =====
+    'req.url',
+    'req.method',
+    'req.headers',
 ]
 
 special_eval_function = [

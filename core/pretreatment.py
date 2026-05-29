@@ -477,8 +477,13 @@ class Pretreatment:
                     new_filepath = filepath + ".pretty"
 
                     try:
-                        # 添加新限制，如果js文件内容大于一定程度，则不解析
-                        if len(code_content) > 3000 or code_content.count('\n') > 500 or code_content.count('\n') < 10:
+                        # 基于代码格式的启发式过滤：
+                        # - 跳过混淆/压缩代码（平均行长 > 500 字符）
+                        # - 跳过极短文件（总行数 < 5）
+                        # - 不再限制总字符数和总行数，以支持 Node.js 服务端大文件
+                        line_count = code_content.count('\n') + 1
+                        avg_line_len = len(code_content) / max(line_count, 1)
+                        if avg_line_len > 500 or line_count < 5:
                             continue
 
                         if not os.path.isfile(new_filepath):

@@ -9,6 +9,11 @@
       "file": "cmd_inject.go",
       "cvi_id": "8001",
       "severity": "high"
+    },
+    {
+      "file": "cmd_inject_node.js",
+      "cvi_id": "3100",
+      "severity": "high"
     }
   ]
 }

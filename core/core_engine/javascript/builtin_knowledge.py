@@ -274,6 +274,214 @@ KNOWLEDGE: Dict[str, Dict[str, Union[List[int], bool]]] = {
         "axios.spread":        {"passthrough": [0], "safe": False},
         "axios.CancelToken":   {"passthrough": [], "safe": True},
         "axios.isCancel":      {"passthrough": [], "safe": True},
+
+        # ===== Node.js: child_process (命令执行) =====
+        "child_process.exec":        {"passthrough": [0], "safe": False},
+        "child_process.execSync":    {"passthrough": [0], "safe": False},
+        "child_process.execFile":    {"passthrough": [0], "safe": False},
+        "child_process.execFileSync": {"passthrough": [0], "safe": False},
+        "child_process.spawn":       {"passthrough": [0], "safe": False},
+        "child_process.spawnSync":   {"passthrough": [0], "safe": False},
+        "child_process.fork":        {"passthrough": [0], "safe": False},
+
+        # ===== Node.js: fs (文件系统) =====
+        "fs.readFileSync":           {"passthrough": [0], "safe": False},
+        "fs.readFile":               {"passthrough": [0], "safe": False},
+        "fs.writeFileSync":          {"passthrough": [0], "safe": False},
+        "fs.writeFile":              {"passthrough": [0], "safe": False},
+        "fs.appendFileSync":         {"passthrough": [0], "safe": False},
+        "fs.appendFile":             {"passthrough": [0], "safe": False},
+        "fs.unlinkSync":             {"passthrough": [0], "safe": False},
+        "fs.unlink":                 {"passthrough": [0], "safe": False},
+        "fs.readdirSync":            {"passthrough": [0], "safe": False},
+        "fs.readdir":                {"passthrough": [0], "safe": False},
+        "fs.statSync":               {"passthrough": [0], "safe": False},
+        "fs.stat":                   {"passthrough": [0], "safe": False},
+        "fs.existsSync":             {"passthrough": [0], "safe": False},
+        "fs.mkdirSync":              {"passthrough": [0], "safe": False},
+        "fs.mkdir":                  {"passthrough": [0], "safe": False},
+        "fs.rmdirSync":              {"passthrough": [0], "safe": False},
+        "fs.rmdir":                  {"passthrough": [0], "safe": False},
+        "fs.createReadStream":       {"passthrough": [0], "safe": False},
+        "fs.createWriteStream":      {"passthrough": [0], "safe": False},
+        "fs.accessSync":             {"passthrough": [0], "safe": False},
+        "fs.access":                 {"passthrough": [0], "safe": False},
+        "fs.chmodSync":              {"passthrough": [0], "safe": False},
+        "fs.chmod":                  {"passthrough": [0], "safe": False},
+        "fs.chownSync":              {"passthrough": [0], "safe": False},
+        "fs.chown":                  {"passthrough": [0], "safe": False},
+        "fs.copyFileSync":           {"passthrough": [0], "safe": False},
+        "fs.copyFile":               {"passthrough": [0], "safe": False},
+        "fs.openSync":               {"passthrough": [0], "safe": False},
+        "fs.open":                   {"passthrough": [0], "safe": False},
+        "fs.renameSync":             {"passthrough": [0], "safe": False},
+        "fs.rename":                 {"passthrough": [0], "safe": False},
+        "fs.lstatSync":              {"passthrough": [0], "safe": False},
+        "fs.lstat":                  {"passthrough": [0], "safe": False},
+        "fs.readlinkSync":           {"passthrough": [0], "safe": False},
+        "fs.readlink":               {"passthrough": [0], "safe": False},
+        "fs.symlinkSync":            {"passthrough": [0], "safe": False},
+        "fs.symlink":                {"passthrough": [0], "safe": False},
+        "fs.unlinkSync":             {"passthrough": [0], "safe": False},
+        "fs.realpathSync":           {"passthrough": [0], "safe": False},
+        "fs.realpath":               {"passthrough": [0], "safe": False},
+        "fs.watch":                  {"passthrough": [0], "safe": False},
+        "fs.watchFile":              {"passthrough": [0], "safe": False},
+
+        # ===== Node.js: path =====
+        "path.join":                 {"passthrough": [0], "safe": False},
+        "path.resolve":              {"passthrough": [0], "safe": False},
+        "path.normalize":            {"passthrough": [0], "safe": False},
+        "path.basename":             {"passthrough": [0], "safe": False},
+        "path.dirname":              {"passthrough": [0], "safe": False},
+        "path.extname":              {"passthrough": [0], "safe": False},
+        "path.relative":             {"passthrough": [0], "safe": False},
+        "path.parse":                {"passthrough": [0], "safe": False},
+        "path.format":               {"passthrough": [0], "safe": False},
+
+        # ===== Node.js: http/https (SSRF风险) =====
+        "http.get":                  {"passthrough": [0], "safe": False},
+        "http.request":              {"passthrough": [0], "safe": False},
+        "https.get":                 {"passthrough": [0], "safe": False},
+        "https.request":             {"passthrough": [0], "safe": False},
+        "http.createServer":         {"passthrough": [0], "safe": False},
+        "https.createServer":        {"passthrough": [0], "safe": False},
+
+        # ===== Node.js: crypto =====
+        "crypto.createHash":         {"passthrough": [0], "safe": False},
+        "crypto.createHmac":         {"passthrough": [0, 1], "safe": False},
+        "crypto.createCipher":       {"passthrough": [0, 1], "safe": False},
+        "crypto.createDecipher":     {"passthrough": [0, 1], "safe": False},
+        "crypto.createCipheriv":     {"passthrough": [0, 1, 2], "safe": False},
+        "crypto.createDecipheriv":   {"passthrough": [0, 1, 2], "safe": False},
+        "crypto.createSign":         {"passthrough": [0], "safe": False},
+        "crypto.createVerify":       {"passthrough": [0], "safe": False},
+        "crypto.randomBytes":        {"passthrough": [], "safe": True},
+        "crypto.pbkdf2":             {"passthrough": [], "safe": True},
+        "crypto.scrypt":             {"passthrough": [], "safe": True},
+        "crypto.createDiffieHellman": {"passthrough": [0], "safe": False},
+
+        # ===== Node.js: Buffer =====
+        "Buffer.from":               {"passthrough": [0], "safe": False},
+        "Buffer.alloc":              {"passthrough": [], "safe": True},
+        "Buffer.allocUnsafe":        {"passthrough": [0], "safe": False},
+        "Buffer.concat":             {"passthrough": [0], "safe": False},
+        "Buffer.allocUnsafeSlow":    {"passthrough": [0], "safe": False},
+
+        # ===== Node.js: net =====
+        "net.connect":               {"passthrough": [0], "safe": False},
+        "net.createConnection":      {"passthrough": [0], "safe": False},
+        "net.createServer":          {"passthrough": [0], "safe": False},
+
+        # ===== Node.js: dns =====
+        "dns.lookup":                {"passthrough": [0], "safe": False},
+        "dns.resolve":               {"passthrough": [0], "safe": False},
+        "dns.reverse":               {"passthrough": [0], "safe": False},
+
+        # ===== Node.js: os =====
+        "os.homedir":                {"passthrough": [], "safe": True},
+        "os.tmpdir":                 {"passthrough": [], "safe": True},
+        "os.hostname":               {"passthrough": [], "safe": True},
+        "os.userInfo":               {"passthrough": [], "safe": True},
+
+        # ===== Node.js: stream =====
+        "stream.pipe":               {"passthrough": [0], "safe": False},
+        "stream.Readable":           {"passthrough": [0], "safe": False},
+        "stream.Writable":           {"passthrough": [0], "safe": False},
+        "stream.Transform":          {"passthrough": [0], "safe": False},
+        "stream.Duplex":             {"passthrough": [0], "safe": False},
+
+        # ===== Node.js: vm (代码执行) =====
+        "vm.runInContext":           {"passthrough": [0], "safe": False},
+        "vm.runInNewContext":        {"passthrough": [0], "safe": False},
+        "vm.runInThisContext":       {"passthrough": [0], "safe": False},
+        "vm.compileFunction":        {"passthrough": [0], "safe": False},
+
+        # ===== Node.js: url / querystring =====
+        "url.parse":                 {"passthrough": [0], "safe": False},
+        "url.format":                {"passthrough": [0], "safe": False},
+        "url.resolve":               {"passthrough": [0], "safe": False},
+        "querystring.parse":         {"passthrough": [0], "safe": False},
+        "querystring.stringify":     {"passthrough": [0], "safe": False},
+        "querystring.escape":        {"passthrough": [0], "safe": False},
+        "querystring.unescape":      {"passthrough": [0], "safe": False},
+
+        # ===== Node.js: zlib =====
+        "zlib.gzip":                 {"passthrough": [0], "safe": False},
+        "zlib.gunzip":               {"passthrough": [0], "safe": False},
+        "zlib.deflate":              {"passthrough": [0], "safe": False},
+        "zlib.inflate":              {"passthrough": [0], "safe": False},
+        "zlib.createGzip":           {"passthrough": [0], "safe": False},
+        "zlib.createGunzip":         {"passthrough": [0], "safe": False},
+        "zlib.createDeflate":        {"passthrough": [0], "safe": False},
+        "zlib.createInflate":        {"passthrough": [0], "safe": False},
+
+        # ===== Node.js: process =====
+        "process.env":               {"passthrough": [0], "safe": False},
+        "process.argv":              {"passthrough": [0], "safe": False},
+        "process.cwd":               {"passthrough": [], "safe": True},
+        "process.exit":              {"passthrough": [], "safe": True},
+        "process.nextTick":          {"passthrough": [], "safe": True},
+
+        # ===== Node.js: eval/Function (代码执行) =====
+        "eval":                      {"passthrough": [0], "safe": False},
+        "Function":                  {"passthrough": [0], "safe": False},
+        "new Function":              {"passthrough": [0], "safe": False},
+        "setTimeout":                {"passthrough": [0], "safe": False},
+        "setInterval":               {"passthrough": [0], "safe": False},
+        "setImmediate":              {"passthrough": [0], "safe": False},
+
+        # ===== Node.js: MongoDB/Mongoose =====
+        "mongoose.Query":            {"passthrough": [0], "safe": False},
+        "mongoose.Model.find":       {"passthrough": [0], "safe": False},
+        "mongoose.Model.findOne":    {"passthrough": [0], "safe": False},
+        "mongoose.Model.update":     {"passthrough": [0], "safe": False},
+        "mongoose.Model.deleteOne":  {"passthrough": [0], "safe": False},
+        "mongoose.Model.deleteMany": {"passthrough": [0], "safe": False},
+        "mongoose.Model.aggregate":  {"passthrough": [0], "safe": False},
+        "mongoose.Model.where":      {"passthrough": [0], "safe": False},
+        "mongoose.Types.ObjectId":   {"passthrough": [0], "safe": False},
+        "MongoClient.connect":       {"passthrough": [0], "safe": False},
+        "Collection.find":           {"passthrough": [0], "safe": False},
+        "Collection.findOne":        {"passthrough": [0], "safe": False},
+        "Collection.updateOne":      {"passthrough": [0], "safe": False},
+        "Collection.deleteOne":      {"passthrough": [0], "safe": False},
+        "Collection.aggregate":      {"passthrough": [0], "safe": False},
+
+        # ===== Node.js: SQL (mysql/pg/sequelize) =====
+        "mysql.query":               {"passthrough": [0], "safe": False},
+        "mysql.escape":              {"passthrough": [0], "safe": True},
+        "mysql.escapeId":            {"passthrough": [0], "safe": True},
+        "mysql2.query":              {"passthrough": [0], "safe": False},
+        "mysql2.escape":             {"passthrough": [0], "safe": True},
+        "pg.query":                  {"passthrough": [0], "safe": False},
+        "sequelize.query":           {"passthrough": [0], "safe": False},
+        "sequelize.literal":         {"passthrough": [0], "safe": False},
+        "sequelize.where":           {"passthrough": [0], "safe": False},
+        "knex.raw":                  {"passthrough": [0], "safe": False},
+        "knex.whereRaw":             {"passthrough": [0], "safe": False},
+
+        # ===== Node.js: Redis =====
+        "redis.get":                 {"passthrough": [0], "safe": False},
+        "redis.set":                 {"passthrough": [0], "safe": False},
+        "redis.eval":                {"passthrough": [0], "safe": False},
+        "redis.evalsha":             {"passthrough": [0], "safe": False},
+
+        # ===== Node.js: XML解析 =====
+        "xml2js.parseString":        {"passthrough": [0], "safe": False},
+        "libxmljs.parseXml":         {"passthrough": [0], "safe": False},
+        "libxmljs.parseHtml":        {"passthrough": [0], "safe": False},
+        "fastXmlParser.parse":       {"passthrough": [0], "safe": False},
+        "sax.parser":                {"passthrough": [0], "safe": False},
+
+        # ===== Node.js: 模板引擎 (服务端) =====
+        "handlebars.compile":        {"passthrough": [0], "safe": False},
+        "mustache.render":           {"passthrough": [0], "safe": False},
+        "dust.render":               {"passthrough": [0], "safe": False},
+        "swig.render":               {"passthrough": [0], "safe": False},
+        "doT.template":              {"passthrough": [0], "safe": False},
+        "underscore.template":       {"passthrough": [0], "safe": False},
+
 }
 
 
