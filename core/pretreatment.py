@@ -32,7 +32,7 @@ import asyncio
 import subprocess
 from collections.abc import Hashable
 
-could_ast_pase_lans = ["php", "chromeext", "javascript", "html", "java", "python", "go"]
+could_ast_pase_lans = ["php", "chromeext", "javascript", "html", "java", "python", "go", "c"]
 
 
 class Pretreatment:
@@ -643,6 +643,42 @@ class Pretreatment:
                         fi.close()
 
                         # 存储源码行列表供 parser 使用
+                        self.pre_result[filepath]["source_lines"] = code_content.splitlines()
+
+                    except Exception:
+                        logger.warning("[AST] something error, {}".format(traceback.format_exc()))
+                        continue
+
+            elif fileext[0] in ext_dict["c"] and ("c" in self.lan or "c++" in self.lan):
+                # 针对 C/C++ 的预处理
+                # 使用 tree-sitter 解析 C/C++ 源文件，生成 AST
+                for filepath in fileext[1]["list"]:
+                    filepath = self.get_path(filepath)
+                    self.pre_result[filepath] = {}
+                    self.pre_result[filepath]["language"] = "c"
+                    self.pre_result[filepath]["ast_nodes"] = []
+
+                    try:
+                        fi = codecs.open(filepath, "r", encoding="utf-8", errors="ignore")
+                        code_content = fi.read()
+                        fi.close()
+
+                        if not self.is_unprecom:
+                            try:
+                                import tree_sitter_c as tsc
+                                from tree_sitter import Language, Parser
+                                C_LANG = Language(tsc.language())
+                                ts_parser = Parser(C_LANG)
+                                tree = ts_parser.parse(bytes(code_content, 'utf8'))
+                                self.pre_result[filepath]['ast_nodes'] = tree
+                            except ImportError:
+                                logger.warning("[AST] tree-sitter-c not installed, skip AST for {}".format(filepath))
+                            except Exception as e:
+                                logger.warning("[AST] [ERROR] tree-sitter parse error for {}: {}".format(filepath, str(e)))
+                        else:
+                            self.pre_result[filepath]["ast_nodes"] = []
+
+                        # 存储源码供 parser 使用
                         self.pre_result[filepath]["source_lines"] = code_content.splitlines()
 
                     except Exception:

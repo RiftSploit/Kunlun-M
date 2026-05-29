@@ -31,9 +31,14 @@
     <language name="JSP">
         <extension value=".jsp"/>
     </language>
-    <language name="C">
-        <extension value=".h"/>
+    <language name="C" chiefly="True">
         <extension value=".c"/>
+        <extension value=".h"/>
+        <extension value=".cpp"/>
+        <extension value=".hpp"/>
+        <extension value=".cc"/>
+        <extension value=".cxx"/>
+        <extension value=".hxx"/>
     </language>
     <language name="Ruby">
         <extension value=".rb"/>
@@ -44,15 +49,17 @@
     <language name="Lua">
         <extension value=".lua"/>
     </language>
-    <language name="Go">
+    <language name="Go" chiefly="True">
         <extension value=".go"/>
     </language>
     <language name="Swift">
         <extension value=".swift"/>
     </language>
     <language name="C++">
-        <extension value=".c"/>
         <extension value=".cpp"/>
+        <extension value=".hpp"/>
+        <extension value=".cc"/>
+        <extension value=".cxx"/>
     </language>
     <language name="C#">
         <extension value=".cs"/>

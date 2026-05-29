@@ -19,6 +19,7 @@ from core.core_engine.php.parser import anlysis_params as php_anlysis_params
 from core.core_engine.javascript.parser import analysis_params as js_analysis_params
 from core.core_engine.python.parser import analysis_params as python_analysis_params
 from core.core_engine.go.parser import analysis_params as go_analysis_params
+from core.core_engine.c.parser import analysis_params as c_analysis_params
 
 from utils.file import File
 from utils.file import FileParseAll
@@ -348,6 +349,28 @@ class CAST(object):
                     logger.debug("[Deep AST] Start AST for param {param_name}".format(param_name=param_name))
 
                     _is_co, _cp, expr_lineno, chain = go_analysis_params(param_name, [],
+                                                                         self.sr.vul_function, self.line, self.file_path,
+                                                                         self.repair_functions, self.controlled_list, isexternal=True)
+
+                    if _is_co == 1:
+                        logger.debug("[AST] Is assign string: Yes")
+                        return True, _is_co, _cp, chain
+                    elif _is_co == 3:
+                        pass
+                    elif _is_co == 4:
+                        if hasattr(_cp[0], "name"):
+                            logger.info("[AST] New vul function {}()".format(_cp[0].name))
+                        else:
+                            logger.info("[AST] New vul function {}()".format(_cp[0]))
+                        return False, _is_co, tuple([_is_co, _cp]), chain
+                    else:
+                        continue
+
+                elif self.language == "c":
+                    logger.debug("[AST] Is variable: Yes")
+                    logger.debug("[Deep AST] Start AST for param {param_name}".format(param_name=param_name))
+
+                    _is_co, _cp, expr_lineno, chain = c_analysis_params(param_name, [],
                                                                          self.sr.vul_function, self.line, self.file_path,
                                                                          self.repair_functions, self.controlled_list, isexternal=True)
 

@@ -1,26 +1,26 @@
 {
   "meta": {
     "target": "/home/ubuntu/.hermes/hermes-agent/Kunlun-M/ci_target",
-    "task_id": 765,
-    "project_id": 80,
-    "started_at": "2026-05-28T10:15:40.055423+00:00",
-    "finished_at": "2026-05-28T10:15:40.613516+00:00",
+    "task_id": 175,
+    "project_id": 122,
+    "started_at": "2026-05-29T10:11:15.741779+00:00",
+    "finished_at": "2026-05-29T10:11:16.825948+00:00",
     "fail_on": "none",
     "include_unconfirm": false,
     "with_vendor": false,
-    "settings_module": "Kunlun_M.settings",
+    "settings_module": "Kunlun_M.settings_ci",
     "mode": "expected_comparison"
   },
   "summary": {
-    "total": 4,
+    "total": 10,
     "by_severity": {
       "critical": 0,
-      "high": 4,
-      "medium": 0,
+      "high": 9,
+      "medium": 1,
       "low": 0
     },
     "max_severity": "high",
-    "expected_count": 2,
+    "expected_count": 7,
     "missing_count": 0,
     "unexpected_count": 2
   },
@@ -34,36 +34,61 @@
       "file": "cmd_inject.go",
       "cvi_id": "8001",
       "severity": "high"
+    },
+    {
+      "file": "cmd_inject_node.js",
+      "cvi_id": "3100",
+      "severity": "high"
+    },
+    {
+      "file": "cmd_inject.py",
+      "cvi_id": "7000",
+      "severity": "high"
+    },
+    {
+      "file": "cmd_inject.java",
+      "cvi_id": "6003",
+      "severity": "high"
+    },
+    {
+      "file": "xss.js",
+      "cvi_id": "3002",
+      "severity": "high"
+    },
+    {
+      "file": "cmd_inject.c",
+      "cvi_id": "9001",
+      "severity": "high"
     }
   ],
   "missing": [],
   "unexpected": [
     {
-      "id": 2655,
-      "cvi_id": "7000",
-      "rule_name": "命令注入",
+      "id": 441,
+      "cvi_id": "6023",
+      "rule_name": "ProcessBuilder Command Injection",
       "severity": "high",
-      "language": "python",
-      "file": "cmd_inject.py:4",
+      "language": "java",
+      "file": "cmd_inject.java:0",
       "is_unconfirm": false,
-      "result_type": "Function-param-controllable",
-      "source_code": "os.system(cmd)"
+      "result_type": "Regex-return-regex",
+      "source_code": "name:<7>, point:<new ProcessBuilder(cmd>"
     },
     {
-      "id": 2656,
-      "cvi_id": "7000",
-      "rule_name": "命令注入",
+      "id": 442,
+      "cvi_id": "6038",
+      "rule_name": "ProcessBuilder Command Injection (function-param-controllable)",
       "severity": "high",
-      "language": "python",
-      "file": "cmd_inject.py:5",
+      "language": "java",
+      "file": "cmd_inject.java:7",
       "is_unconfirm": false,
       "result_type": "Function-param-controllable",
-      "source_code": "subprocess.call(cmd, shell=True)"
+      "source_code": "new ProcessBuilder("
     }
   ],
   "vulnerabilities": [
     {
-      "id": 2654,
+      "id": 437,
       "cvi_id": "1005",
       "rule_name": "SQLI",
       "severity": "high",
@@ -74,7 +99,62 @@
       "source_code": "mysql_query(\"SELECT * FROM users WHERE id=\" . $id)"
     },
     {
-      "id": 2655,
+      "id": 438,
+      "cvi_id": "3002",
+      "rule_name": "XSS",
+      "severity": "medium",
+      "language": "javascript",
+      "file": "xss.js:4",
+      "is_unconfirm": false,
+      "result_type": "Function-param-controllable",
+      "source_code": "document.write"
+    },
+    {
+      "id": 439,
+      "cvi_id": "3100",
+      "rule_name": "命令注入",
+      "severity": "high",
+      "language": "javascript",
+      "file": "cmd_inject_node.js:7",
+      "is_unconfirm": false,
+      "result_type": "Function-param-controllable",
+      "source_code": "exec("
+    },
+    {
+      "id": 440,
+      "cvi_id": "6003",
+      "rule_name": "Command Injection",
+      "severity": "high",
+      "language": "java",
+      "file": "cmd_inject.java:7",
+      "is_unconfirm": false,
+      "result_type": "Function-param-controllable",
+      "source_code": "ProcessBuilder"
+    },
+    {
+      "id": 441,
+      "cvi_id": "6023",
+      "rule_name": "ProcessBuilder Command Injection",
+      "severity": "high",
+      "language": "java",
+      "file": "cmd_inject.java:0",
+      "is_unconfirm": false,
+      "result_type": "Regex-return-regex",
+      "source_code": "name:<7>, point:<new ProcessBuilder(cmd>"
+    },
+    {
+      "id": 442,
+      "cvi_id": "6038",
+      "rule_name": "ProcessBuilder Command Injection (function-param-controllable)",
+      "severity": "high",
+      "language": "java",
+      "file": "cmd_inject.java:7",
+      "is_unconfirm": false,
+      "result_type": "Function-param-controllable",
+      "source_code": "new ProcessBuilder("
+    },
+    {
+      "id": 443,
       "cvi_id": "7000",
       "rule_name": "命令注入",
       "severity": "high",
@@ -85,7 +165,7 @@
       "source_code": "os.system(cmd)"
     },
     {
-      "id": 2656,
+      "id": 444,
       "cvi_id": "7000",
       "rule_name": "命令注入",
       "severity": "high",
@@ -96,7 +176,7 @@
       "source_code": "subprocess.call(cmd, shell=True)"
     },
     {
-      "id": 2657,
+      "id": 445,
       "cvi_id": "8001",
       "rule_name": "命令注入",
       "severity": "high",
@@ -105,6 +185,17 @@
       "is_unconfirm": false,
       "result_type": "Function-param-controllable",
       "source_code": "exec.Command"
+    },
+    {
+      "id": 446,
+      "cvi_id": "9001",
+      "rule_name": "命令注入",
+      "severity": "high",
+      "language": "c",
+      "file": "cmd_inject.c:9",
+      "is_unconfirm": false,
+      "result_type": "Function-param-controllable",
+      "source_code": "system("
     }
   ],
   "exit": {
