@@ -1,19 +1,9 @@
 {
   "expected": [
-    {
-      "file": "sqli.php",
-      "cvi_id": "1005",
-      "severity": "high"
-    },
-    {
-      "file": "cmd_inject.go",
-      "cvi_id": "8001",
-      "severity": "high"
-    },
-    {
-      "file": "cmd_inject_node.js",
-      "cvi_id": "3100",
-      "severity": "high"
-    }
+    {"file": "sqli.php", "cvi_id": "1005", "severity": "high"},
+    {"file": "cmd_inject.go", "cvi_id": "8001", "severity": "high"},
+    {"file": "cmd_inject_node.js", "cvi_id": "3100", "severity": "high"},
+    {"file": "cmd_inject.py", "cvi_id": "7000", "severity": "high"},
+    {"file": "cmd_inject.java", "cvi_id": "6003", "severity": "high"}
   ]
 }

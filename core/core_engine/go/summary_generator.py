@@ -20,17 +20,12 @@ from core.core_engine.function_summary import FileSummary, FunctionSummary, Retu
 from utils.log import logger
 
 # tree-sitter 初始化
-try:
-    import tree_sitter_go as _tsgo
-    from tree_sitter import Language as _TS_Language, Parser as _TS_Parser
+import tree_sitter_go as _tsgo
+from tree_sitter import Language as _TS_Language, Parser as _TS_Parser
 
-    _GO_TS_LANGUAGE = _TS_Language(_tsgo.language())
-    _ts_parser = _TS_Parser(_GO_TS_LANGUAGE)
-    _HAS_TREE_SITTER = True
-except ImportError:
-    _HAS_TREE_SITTER = False
-    _ts_parser = None
-    _GO_TS_LANGUAGE = None
+_GO_TS_LANGUAGE = _TS_Language(_tsgo.language())
+_ts_parser = _TS_Parser(_GO_TS_LANGUAGE)
+_HAS_TREE_SITTER = True
 
 # Go 字面量标识符
 _LITERAL_IDENTS = frozenset({"nil", "true", "false"})

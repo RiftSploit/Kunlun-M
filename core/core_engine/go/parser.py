@@ -25,16 +25,12 @@ from core.core_engine.go.summary_generator import generate_file_summaries, looku
 from core.core_engine.function_summary import SummaryCacheManager
 
 # tree-sitter Go AST 解析
-try:
-    import tree_sitter_go as _tsgo
-    from tree_sitter import Language as _TS_Language, Parser as _TS_Parser
-    _GO_TS_LANGUAGE = _TS_Language(_tsgo.language())
-    _ts_parser = _TS_Parser(_GO_TS_LANGUAGE)
-    _HAS_TREE_SITTER = True
-except ImportError:
-    _HAS_TREE_SITTER = False
-    _ts_parser = None
-    _GO_TS_LANGUAGE = None
+import tree_sitter_go as _tsgo
+from tree_sitter import Language as _TS_Language, Parser as _TS_Parser
+
+_GO_TS_LANGUAGE = _TS_Language(_tsgo.language())
+_ts_parser = _TS_Parser(_GO_TS_LANGUAGE)
+_HAS_TREE_SITTER = True
 
 scan_results = []
 is_repair_functions = []
@@ -250,8 +246,6 @@ _package_name_cache = {}  # file_path → package_name
 
 def _parse_go_ast(file_path):
     """用 tree-sitter 解析 Go 文件，返回 AST tree（带缓存）"""
-    if not _HAS_TREE_SITTER:
-        return None
     if file_path in _ast_cache:
         return _ast_cache[file_path]
     try:
@@ -2383,33 +2377,6 @@ def scan_parser(rule_match, vul_lineno, file_path,
 
         results.append({'code': -1, 'chain': []})
         return results
-
-    # ---- AST 失败：使用 line_text 文本 fallback ----
-    if not is_config_vuln and line_text:
-        import re as _re_fallback
-        escaped_func = _re_fallback.escape(matched_func)
-        call_match = _re_fallback.search(escaped_func + r'\s*\(([^)]*)\)', line_text)
-        if call_match:
-            args_text = call_match.group(1)
-            for arg in _re_fallback.split(r',\s*', args_text):
-                arg = arg.strip()
-                if _re_fallback.match(r'^"[^"]*"$', arg):
-                    continue
-                var_match = _re_fallback.findall(r'[a-zA-Z_]\w*', arg)
-                for var_name in var_match:
-                    if var_name in ('sh', 'bash', 'c', 'true', 'false', 'nil', 'string', 'int'):
-                        continue
-                    # 简单文本追踪：向上查找 var_name 的赋值来源
-                    code, src_line = _text_trace_variable(
-                        file_path, var_name, vul_lineno,
-                        repair_functions, controlled_params
-                    )
-                    if code == 1:
-                        results.append({'code': 1, 'chain': [
-                            ('source', var_name, file_path, src_line if src_line else vul_lineno),
-                            ('sink', matched_func, file_path, vul_lineno)
-                        ]})
-                        return results
 
     if is_config_vuln:
         results.append({
