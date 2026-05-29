@@ -531,7 +531,14 @@ class SingleRule(object):
         # exists result
         if origin_results == '' or origin_results is None:
             logger.debug('[CVI-{cvi}] [ORIGIN] NOT FOUND!'.format(cvi=self.sr.svid))
+            print('[CI] DEBUG: [CVI-{cvi}] origin_results=None, match_mode={mm}, match={m}'.format(
+                cvi=self.sr.svid, mm=self.sr.match_mode, m=getattr(self.sr, 'match', '?')))
             return None
+        else:
+            print('[CI] DEBUG: [CVI-{cvi}] origin_results count={cnt}, match_mode={mm}'.format(
+                cvi=self.sr.svid, cnt=len(origin_results), mm=self.sr.match_mode))
+            for i, ov in enumerate(origin_results[:5]):
+                print('[CI] DEBUG: [CVI-{cvi}] origin[{i}]: {ov}'.format(cvi=self.sr.svid, i=i, ov=ov))
 
         # framework-dependency 模式: 直接生成结果，不需要 AST 分析
         if self.sr.match_mode == const.mm_framework_dependency:
@@ -585,6 +592,9 @@ class SingleRule(object):
                 else:
                     is_vulnerability, reason = False, "Unpack error"
 
+                print('[CI] DEBUG: [CVI-{cvi}] Core.scan() result: is_vul={iv}, reason={r}'.format(
+                    cvi=self.sr.svid, iv=is_vulnerability, r=reason))
+
                 if is_vulnerability:
                     logger.debug('[CVI-{cvi}] [RET] Found {code}'.format(cvi=self.sr.svid, code=reason))
                     vulnerability.analysis = reason
@@ -605,6 +615,8 @@ class SingleRule(object):
                     else:
                         logger.debug('Not vulnerability: {code}'.format(code=reason))
             except Exception:
+                print('[CI] DEBUG: [CVI-{cvi}] EXCEPTION in Core.scan(): {e}'.format(
+                    cvi=self.sr.svid, e=traceback.format_exc()))
                 raise
         logger.debug('[CVI-{cvi}] {vn} Vulnerabilities: {count}'.format(cvi=self.sr.svid, vn=self.sr.vulnerability,
                                                                         count=len(self.rule_vulnerabilities)))
