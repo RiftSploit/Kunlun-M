@@ -7,8 +7,8 @@
 > Thanks to the AI era, I can address the project's basic maintenance issues at extremely low cost. Although the project's concepts may not be cutting-edge by today's standards, the stable core still serves as a solid tool reference. I will continue to iterate rapidly using Codex at minimal cost, boldly experiment with new features, and **attempt to build a potentially very useful tool using AI-era methods**.
 
 # Kunlun-Mirror
--[![GitHub release](https://img.shields.io/github/release/LoRexxar/Kunlun-M/all.svg)](https://github.com/LoRexxar/Kunlun-M/releases)
--[![license](https://img.shields.io/github/license/LoRexxar/Kunlun-M.svg)](./LICENSE)
+[![GitHub release](https://img.shields.io/github/release/LoRexxar/Kunlun-M/all.svg)](https://github.com/LoRexxar/Kunlun-M/releases)
+[![license](https://img.shields.io/github/license/LoRexxar/Kunlun-M.svg)](./LICENSE)
 ![](https://img.shields.io/badge/language-python3.13-orange.svg)
 
 ```
@@ -58,10 +58,6 @@ Cobra-W is a fork evolved from Cobra 2.0, shifting the tool's focus from discove
 Kunlun-Mirror evolved from Cobra-W 2.0. After going through the painful process of maintaining and improving the original tool, Kunlun-Mirror (昆仑镜) shifts the tool's focus towards serving security researchers, continuously improving the user experience around practical tool-based usage.
 
 The tool currently primarily supports semantic analysis for **PHP, JavaScript, Python, Java, and Go**, as well as basic scanning for **Chrome extensions and Solidity**.
-
-**Java scanning engine** (v2.9.0) supports AST-based taint analysis, framework-level vulnerability detection (Shiro/Struts2/Log4j/Fastjson etc.), and 58 built-in rules covering 20+ vulnerability types.
-
-**Go scanning engine** (v2.11.0) supports AST-based taint analysis with cross-file import resolution, function summary caching, and 8 built-in rules covering command injection, SQL injection, XSS, file operations, SSRF, path traversal, unsafe deserialization, and information disclosure.
 
 Built-in Skills have been added, **supporting one-click integration with AI Agents (OpenClaw / Codex / Claude Code / Hermes, etc.)** for rapid vulnerability scanning.
 
