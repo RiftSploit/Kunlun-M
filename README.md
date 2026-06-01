@@ -17,7 +17,7 @@
 | |/ / _   _ _ __ | |    _   _ _ __       | .  . |
 |    \| | | | '_ \| |   | | | | '_ \ _____| |\/| |
 | |\  \ |_| | | | | |___| |_| | | | |_____| |  | |
-\_| \_/\__,_|_| |_\_____/\__,_|_| |_|     \_|  |_/  -v2.12
+\_| \_/\__,_|_| |_\_____/\__,_|_| |_|     \_|  |_/  -v2.13
 
 GitHub: https://github.com/LoRexxar/Kunlun-M
 
@@ -57,7 +57,7 @@ Cobra-W is a fork evolved from Cobra 2.0, shifting the tool's focus from discove
 
 Kunlun-Mirror evolved from Cobra-W 2.0. After going through the painful process of maintaining and improving the original tool, Kunlun-Mirror (昆仑镜) shifts the tool's focus towards serving security researchers, continuously improving the user experience around practical tool-based usage.
 
-The tool currently primarily supports semantic analysis for **PHP, Nodejs/JavaScript, Python, Java, and Go**, as well as basic scanning for **Chrome extensions and Solidity**.
+The tool currently primarily supports semantic analysis for **PHP, Nodejs/JavaScript, Python, Java, Go, and C/C++**, as well as basic scanning for **Chrome extensions and Solidity**.
 
 Built-in Skills have been added, **supporting one-click integration with AI Agents (OpenClaw / Codex / Claude Code / Hermes, etc.)** for rapid vulnerability scanning.
 
@@ -188,7 +188,7 @@ python3 kunlun.py console
 | |/ / _   _ _ __ | |    _   _ _ __       | .  . |
 |    \| | | | '_ \| |   | | | | '_ \ _____| |\/| |
 | |\  \ |_| | | | | |___| |_| | | | |_____| |  | |
-\_| \_/\__,_|_| |_\_____/\__,_|_| |_|     \_|  |_/  -v2.12
+\_| \_/\__,_|_| |_\_____/\__,_|_| |_|     \_|  |_/  -v2.13
 
 GitHub: https://github.com/LoRexxar/Kunlun-M
 

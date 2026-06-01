@@ -1,4 +1,31 @@
 ## 更新日志
+- 2026-06-01
+  - KunLun-M 2.13.0
+  - **新增 C/C++ 静态代码扫描引擎**
+    - 基于 tree-sitter 的 AST 语义分析引擎（`core/core_engine/c/`），支持 C/C++ 源文件扫描
+    - `scan_parser()`: 反向污点追踪，支持赋值链、指针声明、函数返回值、跨函数追踪
+    - `_build_func_def_index()`: 预建函数定义索引，支持函数体内 sink 追踪
+    - `function_back_c()`: 跨函数追踪，支持 `deps` 机制（返回值依赖分析）
+    - `_propagate_controllable_in_body()`: 函数体内可控性传播，支持函数调用输出参数（fgets/scanf）
+    - 内置知识库新增 C 标准库函数（libc 90+ 条），含 safe/passthrough/repair 属性标注
+  - **新增 7 条 C/C++ 漏洞规则**（CVI-9001 ~ CVI-9007）
+    - CVI-9001: 命令注入（system/popen/exec/execl 等）
+    - CVI-9002: 格式化字符串漏洞（printf/fprintf/sprintf/snprintf 等）
+    - CVI-9003: 缓冲区溢出（strcpy/strcat/gets 等）
+    - CVI-9004: 路径穿越（fopen/access 等）
+    - CVI-9005: 整数溢出（malloc/calloc/realloc 参数）
+    - CVI-9006: 环境变量注入（setenv/putenv 等）
+    - CVI-9007: 任意文件读取（open/read 等）
+  - **新增 7 个 CI 测试用例**（`ci_target/` 下 C 文件），覆盖全部 7 条规则
+  - **新增 24 个 Benchmark 测试文件**（`tests/c/`），覆盖 22 个漏洞场景 + 2 个误报排除
+  - **CI 预期表更新**
+    - `ci_target/expected.json` 新增 C/C++ 7 条预期（CVI-9001~9007）
+    - `ci_target/expected.json` 新增 Java CVI-6023/CVI-6038 预期（消除额外检出警告）
+  - **依赖更新**
+    - `requirements.txt` 新增 `tree-sitter-c` 和 `tree-sitter-cpp`
+  - **基础设施改动**
+    - `.gitignore` 添加 `!rules/c/` 白名单（C 规则文件入仓库）
+    - `.gitignore` 添加 `!tests/c/` 白名单（C 测试文件入仓库）
 - 2026-05-29
   - KunLun-M 2.12.0
   - **Node.js 扫描能力扩展（Phase 1）**
