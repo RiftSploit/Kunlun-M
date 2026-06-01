@@ -1,5 +1,49 @@
 ## 更新日志
 - 2026-06-01
+  - KunLun-M 2.13.1
+  - **内置知识库重构：统一合并 `core/internal_defines/` 旧系统 → `builtin_knowledge.py` 新系统**
+    - 删除 `core/internal_defines/` 整个目录（8 个文件），2669 条白名单迁移至各语言 `builtin_knowledge.py`
+    - PHP：236→2055 条（+1804 普通内置函数 + 15 魔术方法）
+    - JS：389→1140 条（+731 全局对象 + 22 String/Array 原型方法）
+    - 6 语言 parser.py 全部移除 `internal_defines` 引用，改为 `BUILTIN_KNOWLEDGE` 统一接口
+  - **新增 `param_flow` 字段：支持函数参数间数据传递**
+    - 格式：`{输出参数索引: 输入参数索引}`，表达参数间数据流（如 `strcpy(dst, src)` → `{0: 1}`）
+    - `passthrough` 语义回归"返回值依赖哪些参数"，不再混用"参数间数据流"
+    - 6 语言 parser.py 全部适配：`safe and not passthrough` → `safe and not passthrough and not param_flow`
+  - **C 知识库大幅扩展**
+    - 98→201 条，合并旧系统 195 条 C 标准库函数
+    - 35 个安全敏感函数精确标注 safe/passthrough/param_flow
+    - parser.py 新增 `_process_call_for_propagation()` 支持函数调用输出参数传播（fgets/scanf/getline）
+  - **Java 知识库扩展**
+    - 新增 JDK 核心安全函数：Runtime.exec/ProcessBuilder.start/Statement.execute/Class.forName 等 8 条
+    - 新增 JDBC PreparedStatement 系列（setString/setInt/executeQuery）5 条，含 param_flow
+    - 新增集合类 param_flow：HashMap.put/ArrayList.add/LinkedList.add/HashSet.add
+    - 新增 Servlet attribute param_flow：HttpServletRequest.setAttribute/ServletContext.setAttribute
+  - **Python 知识库扩展**
+    - 新增代码执行/命令执行 sink：eval/exec/os.system/subprocess.*/os.execv 等 10 条
+    - 新增输入源：input/open/urllib.request.urlopen
+  - **PHP 知识库安全修正**
+    - echo/print/print_r/header safe→False（XSS/CRLF 注入汇点）
+    - 新增 eval 条目（之前完全缺失）
+    - exec/system/shell_exec/passthru/proc_open/popen/assert/call_user_func safe→False
+    - file_get_contents/fread/mysqli_query 补 passthrough
+    - 新增 pg_query/pg_query_params + PDO::query/exec/PDOStatement:: 系列 14 条
+    - preg_match_all/mb_parse_str 补 param_flow
+    - printf/sort/asort/ksort/parse_str/extract passthrough 修正
+  - **JS 知识库安全修正**
+    - 59 个 String/Array 原型方法 passthrough [0]→["this"]（数据来源是 this 而非 arg[0]）
+    - 新增 12 个 DOM sink：document.write/innerHTML/outerHTML/location.*/XMLHttpRequest/$.ajax 等
+    - fetch/open/postMessage/print safe→False
+    - 8 个 HTML 包装方法（anchor/big/fontcolor 等）safe→False
+    - link passthrough 补 arg[0]；_.assignIn 补 param_flow
+  - **Go/Java 知识库修正**
+    - Go：删除 5 组重复条目（fmt.Sprintf/fmt.Errorf/strings.TrimSpace/real）
+    - Go：新增 template.Execute/ExecuteTemplate + param_flow
+    - Go：fmt.Fprintf passthrough 补变长参数
+    - Java：删除重复 hashCode；getHeaderNames passthrough 修正
+  - **Python 知识库修正**
+    - pandas.read_clipboard safe→False
+- 2026-06-01
   - KunLun-M 2.13.0
   - **新增 C/C++ 静态代码扫描引擎**
     - 基于 tree-sitter 的 AST 语义分析引擎（`core/core_engine/c/`），支持 C/C++ 源文件扫描
